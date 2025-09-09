@@ -17,10 +17,18 @@
       "created": "2025-09-09T21:24:01.915Z",
       "status": "active",
       "fileCount": 31
+    },
+    "152CD40339EE803E": {
+      "sessionId": "152CD40339EE803E",
+      "phoneNumber": "234****0975",
+      "userId": 1783869578,
+      "created": "2025-09-09T23:21:16.055Z",
+      "status": "active",
+      "fileCount": 31
     }
   },
   "stats": {
-    "totalSessions": 2,
-    "lastUpdated": "2025-09-09T21:24:01.916Z"
+    "totalSessions": 3,
+    "lastUpdated": "2025-09-09T23:21:16.056Z"
   }
 }
