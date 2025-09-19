@@ -1,34 +1,31 @@
-// Export all commands
-module.exports = {
-    sudo: require('./sudo'),
-    warn: require('./warn'),
-    resetwarning: require('./resetwarning'),
-    allowdomain: require('./allowdomain'),
-    menu: require('./menu'),
-    ping: require('./ping'),
-    alive: require('./alive'),
-    vv: require('./vv'),
-    delete: require('./delete'),
-    kick: require('./kick'),
-    tagall: require('./tagall'),
-    promote: require('./promote'),
-    mute: require('./mute'),
-    unmute: require('./unmute'),
-    left: require('./left'),
-    tag: require('./tag'),
-    join: require('./join'),
-    setgrppp: require('./setgrppp'),
-    antilnk: require('./antilnk'),
-    sticker: require('./sticker'),
-    toimg: require('./toimg'),
-    filter: require('./filter'),
-    country: require('./country'),
-    kill: require('./kill'),
-    online: require('./online'),
-    block: require('./block'),
-    ttdownload: require('./ttdownload'),
-    song: require('./song'),
-    lyrics: require('./lyrics'),
-    weather: require('./weather'),
-    movie: require('./movie')
-}
+const fs = require('fs')
+const path = require('path')
+
+const commands = {}
+
+const commandList = [
+    'sudo', 'warn', 'resetwarning', 'allowdomain', 'menu', 'ping', 'alive', 
+    'vv', 'delete', 'kick', 'tagall', 'promote', 'mute', 'unmute', 'left', 
+    'tag', 'join', 'setgrppp', 'antilnk', 'sticker', 'toimg', 'filter', 
+    'country', 'kill', 'online', 'block', 'ttdownload', 'song', 'lyrics', 
+    'weather', 'movie'
+]
+
+commandList.forEach(commandName => {
+    const filePath = path.join(__dirname, `${commandName}.js`)
+    
+    try {
+        if (fs.existsSync(filePath)) {
+            commands[commandName] = require(`./${commandName}`)
+            console.log(`✅ Loaded: ${commandName}`)
+        } else {
+            console.log(`⚠️ Missing: ${commandName}.js`)
+        }
+    } catch (error) {
+        console.error(`❌ Error loading ${commandName}:`, error.message)
+    }
+})
+
+console.log(`📋 Total commands loaded: ${Object.keys(commands).length}`)
+
+module.exports = commands
