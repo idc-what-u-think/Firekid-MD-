@@ -1,14 +1,13 @@
-const menu = async (m) => {
+const menu = async (m, sock) => {
     const user = m.pushName || 'user'
     const time = new Date().toLocaleTimeString()
     
     const menuText = `----------------{Firekid XMD}---------------
 Hello ${user}
 Time: ${time}
-UPTIME: ${process.uptime()}
+UPTIME: ${Math.floor(process.uptime())}s
 PING: ${Date.now() - m.messageTimestamp * 1000}ms
 Version: 1.0.0
-
 Available Commands:
 - menu: Shows this menu
 - ping: Check bot response time
@@ -42,10 +41,9 @@ Available Commands:
 - lyrics: Get song lyrics
 - weather: Get weather info
 - movie: Search movie details
-
 [Made By Firekid]`
-
-    return await m.reply(menuText)
+    
+    return await sock.sendMessage(m.key.remoteJid, { text: menuText })
 }
 
 module.exports = {
