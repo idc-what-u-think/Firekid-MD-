@@ -7,11 +7,16 @@ const mute = async (sock, msg, args, context) => {
     
     try {
         const groupMetadata = await sock.groupMetadata(context.from);
-        const participant = groupMetadata.participants.find(p => p.id === context.sender);
-        const isAdmin = participant?.admin === 'admin' || participant?.admin === 'superadmin';
         
-        const botParticipant = groupMetadata.participants.find(p => p.id === sock.user.id);
-        const botAdmin = botParticipant?.admin === 'admin' || botParticipant?.admin === 'superadmin';
+        const senderParticipant = groupMetadata.participants.find(p => p.id === context.sender);
+        const isAdmin = senderParticipant && (senderParticipant.admin === 'admin' || senderParticipant.admin === 'superadmin');
+        
+        const botId = sock.user.id.split(':')[0] + '@s.whatsapp.net';
+        const botParticipant = groupMetadata.participants.find(p => p.id === botId);
+        const botAdmin = botParticipant && (botParticipant.admin === 'admin' || botParticipant.admin === 'superadmin');
+        
+        console.log('Sender:', context.sender, 'IsAdmin:', isAdmin);
+        console.log('Bot ID:', botId, 'IsBotAdmin:', botAdmin);
         
         if (!isAdmin) {
             return await sock.sendMessage(context.from, { 
@@ -38,7 +43,7 @@ const mute = async (sock, msg, args, context) => {
     } catch (error) {
         console.error('Error in mute command:', error.message);
         return await sock.sendMessage(context.from, { 
-            text: '❌ Failed to mute group' 
+            text: `❌ Failed to mute group: ${error.message}` 
         });
     }
 };
