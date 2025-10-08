@@ -1,4 +1,7 @@
-let sudoUsers = new Set()
+const fs = require('fs');
+const path = require('path');
+
+const SUDO_FILE = path.join(__dirname, 'sudo_users.json');
 
 const countryCodes = {
     '1': 'US/Canada',
@@ -39,51 +42,91 @@ const countryCodes = {
     '52': 'Mexico',
     '61': 'Australia',
     '64': 'New Zealand'
-}
+};
+
+const loadSudoUsers = () => {
+    try {
+        if (fs.existsSync(SUDO_FILE)) {
+            const data = fs.readFileSync(SUDO_FILE, 'utf8');
+            const parsed = JSON.parse(data);
+            return new Set(parsed.users || []);
+        }
+        return new Set();
+    } catch (error) {
+        console.error('Error loading sudo users:', error);
+        return new Set();
+    }
+};
+
+const saveSudoUsers = (users) => {
+    try {
+        const data = {
+            users: Array.from(users),
+            lastUpdated: new Date().toISOString()
+        };
+        fs.writeFileSync(SUDO_FILE, JSON.stringify(data, null, 2));
+        return true;
+    } catch (error) {
+        console.error('Error saving sudo users:', error);
+        return false;
+    }
+};
+
+let sudoUsers = loadSudoUsers();
 
 const formatPhoneNumber = (number) => {
-    let cleaned = number.replace(/[^0-9]/g, '')
+    let cleaned = number.replace(/[^0-9]/g, '');
     
     if (number.startsWith('+')) {
-        cleaned = number.slice(1).replace(/[^0-9]/g, '')
-        return cleaned + '@s.whatsapp.net'
+        cleaned = number.slice(1).replace(/[^0-9]/g, '');
+        return cleaned + '@s.whatsapp.net';
     }
     
     if (cleaned.length > 10 && !cleaned.startsWith('0')) {
-        return cleaned + '@s.whatsapp.net'
+        return cleaned + '@s.whatsapp.net';
     }
     
     if (cleaned.startsWith('0')) {
         if (cleaned.length === 11) {
             if (cleaned.match(/^0[7-9][0-1]/)) {
-                return '234' + cleaned.slice(1) + '@s.whatsapp.net'
+                return '234' + cleaned.slice(1) + '@s.whatsapp.net';
             }
             if (cleaned.startsWith('08')) {
-                return '62' + cleaned.slice(1) + '@s.whatsapp.net'
+                return '62' + cleaned.slice(1) + '@s.whatsapp.net';
             }
         }
         
-        return '62' + cleaned.slice(1) + '@s.whatsapp.net'
+        return '62' + cleaned.slice(1) + '@s.whatsapp.net';
     }
     
     if (cleaned.length === 10) {
-        return cleaned + '@s.whatsapp.net'
+        return cleaned + '@s.whatsapp.net';
     }
     
-    return cleaned + '@s.whatsapp.net'
-}
+    return cleaned + '@s.whatsapp.net';
+};
 
 const sudo = async (sock, msg, args, context) => {
-    const OWNER_ID = '8064610975@s.whatsapp.net'
+    const ownerNumber = process.env.OWNER_NUMBER;
     
-    if (context.sender !== OWNER_ID) {
+    if (!ownerNumber) {
+        return await sock.sendMessage(context.from, {
+            text: '❌ OWNER_NUMBER not configured in environment variables'
+        });
+    }
+    
+    const normalizedOwner = ownerNumber.includes('@') 
+        ? ownerNumber 
+        : `${ownerNumber}@s.whatsapp.net`;
+    
+    if (context.sender !== normalizedOwner) {
         return await sock.sendMessage(context.from, {
             text: '❌ Only the bot owner can use sudo commands'
         });
     }
 
-    const action = args[0]
-    const number = args.slice(1).join(' ')
+    const action = args[0];
+    const number = args.slice(1).join(' ');
     
     if (!action) {
         return await sock.sendMessage(context.from, {
@@ -109,7 +152,7 @@ const sudo = async (sock, msg, args, context) => {
                     });
                 }
                 
-                const formattedNum = formatPhoneNumber(number)
+                const formattedNum = formatPhoneNumber(number);
                 
                 if (sudoUsers.has(formattedNum)) {
                     return await sock.sendMessage(context.from, {
@@ -117,22 +160,29 @@ const sudo = async (sock, msg, args, context) => {
                     });
                 }
 
-                sudoUsers.add(formattedNum)
+                sudoUsers.add(formattedNum);
                 
-                const countryCode = formattedNum.split('@')[0]
-                let detectedCountry = 'Unknown'
+                if (!saveSudoUsers(sudoUsers)) {
+                    return await sock.sendMessage(context.from, {
+                        text: '❌ Failed to save sudo user'
+                    });
+                }
+                
+                const countryCode = formattedNum.split('@')[0];
+                let detectedCountry = 'Unknown';
                 
                 for (const [code, country] of Object.entries(countryCodes)) {
                     if (countryCode.startsWith(code)) {
-                        detectedCountry = country
-                        break
+                        detectedCountry = country;
+                        break;
                     }
                 }
                 
                 return await sock.sendMessage(context.from, {
                     text: `✅ Added *${number}* to sudo users
 🌍 Detected country: ${detectedCountry}
-📱 Formatted as: ${countryCode}`
+📱 Formatted as: ${countryCode}
+💾 Saved to storage`
                 });
 
             case 'remove':
@@ -142,9 +192,16 @@ const sudo = async (sock, msg, args, context) => {
                     });
                 }
                 
-                const formatNum = formatPhoneNumber(number)
+                const formatNum = formatPhoneNumber(number);
 
                 if (sudoUsers.delete(formatNum)) {
+                    if (!saveSudoUsers(sudoUsers)) {
+                        sudoUsers.add(formatNum);
+                        return await sock.sendMessage(context.from, {
+                            text: '❌ Failed to save changes'
+                        });
+                    }
+                    
                     return await sock.sendMessage(context.from, {
                         text: `✅ Removed *${number}* from sudo users`
                     });
@@ -162,19 +219,19 @@ const sudo = async (sock, msg, args, context) => {
                 
                 const list = Array.from(sudoUsers)
                     .map((num, index) => {
-                        const phoneNum = num.replace('@s.whatsapp.net', '')
-                        let country = 'Unknown'
+                        const phoneNum = num.replace('@s.whatsapp.net', '');
+                        let country = 'Unknown';
                         
                         for (const [code, countryName] of Object.entries(countryCodes)) {
                             if (phoneNum.startsWith(code)) {
-                                country = countryName
-                                break
+                                country = countryName;
+                                break;
                             }
                         }
                         
-                        return `${index + 1}. +${phoneNum} (${country})`
+                        return `${index + 1}. +${phoneNum} (${country})`;
                     })
-                    .join('\n')
+                    .join('\n');
                 
                 return await sock.sendMessage(context.from, {
                     text: `📝 *Sudo Users (${sudoUsers.size}):*\n\n${list}`
@@ -186,19 +243,19 @@ const sudo = async (sock, msg, args, context) => {
                 });
         }
     } catch (error) {
-        console.error('Error in sudo command:', error)
+        console.error('Error in sudo command:', error);
         return await sock.sendMessage(context.from, {
             text: '❌ Failed to process sudo command'
         });
     }
-}
+};
 
 const isSudo = (userId) => {
-    return sudoUsers.has(userId)
-}
+    return sudoUsers.has(userId);
+};
 
 module.exports = {
     command: 'sudo',
     handler: sudo,
     isSudo
-}
+};
