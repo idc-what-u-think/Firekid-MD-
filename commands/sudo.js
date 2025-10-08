@@ -123,12 +123,8 @@ const isOwner = (sender) => {
     const ownerNumber = process.env.OWNER_NUMBER;
     if (!ownerNumber) return false;
     
-    const normalizedOwner = ownerNumber.includes('@') 
-        ? ownerNumber 
-        : `${ownerNumber}@s.whatsapp.net`;
-    
-    const senderNumber = sender.split('@')[0];
-    const ownerNum = normalizedOwner.split('@')[0];
+    const senderNumber = sender.split('@')[0].split(':')[0];
+    const ownerNum = ownerNumber.replace(/[^0-9]/g, '');
     
     return senderNumber === ownerNum;
 };
