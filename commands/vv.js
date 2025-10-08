@@ -21,18 +21,22 @@ const vv = async (sock, msg, args, context) => {
             
             let buffer;
             try {
-                const downloadMsg = {
-                    message: {
-                        extendedTextMessage: {
-                            contextInfo: msg.message.extendedTextMessage.contextInfo
-                        }
-                    }
+                const messageToDownload = {
+                    key: msg.message.extendedTextMessage.contextInfo.participant 
+                        ? { 
+                            remoteJid: msg.message.extendedTextMessage.contextInfo.participant,
+                            fromMe: false,
+                            id: msg.message.extendedTextMessage.contextInfo.stanzaId
+                          }
+                        : msg.key,
+                    message: viewOnceMsg
                 };
-                buffer = await sock.downloadMediaMessage(downloadMsg);
+                
+                buffer = await sock.downloadMediaMessage(messageToDownload);
             } catch (e) {
                 console.error('Download error:', e);
                 return await sock.sendMessage(context.from, {
-                    text: '❌ Failed to download media. The message might be expired.'
+                    text: '❌ Failed to download media. The message might be expired or already viewed.'
                 });
             }
             
@@ -79,7 +83,7 @@ const vv = async (sock, msg, args, context) => {
                 try {
                     await sock.sendMessage(context.from, { 
                         image: buffer,
-                        caption: '📱 View once media revealed (unknown type)'
+                        caption: '📱 View once media revealed'
                     }, { quoted: msg });
                 } catch {
                     await sock.sendMessage(context.from, { 
