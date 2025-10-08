@@ -119,23 +119,22 @@ const formatPhoneNumber = (number) => {
     return cleaned + '@s.whatsapp.net';
 };
 
-const sudo = async (sock, msg, args, context) => {
+const isOwner = (sender) => {
     const ownerNumber = process.env.OWNER_NUMBER;
-    
-    if (!ownerNumber) {
-        return await sock.sendMessage(context.from, {
-            text: '❌ OWNER_NUMBER not configured in environment variables'
-        });
-    }
+    if (!ownerNumber) return false;
     
     const normalizedOwner = ownerNumber.includes('@') 
         ? ownerNumber 
         : `${ownerNumber}@s.whatsapp.net`;
     
-    console.log('Sender:', context.sender);
-    console.log('Owner:', normalizedOwner);
+    const senderNumber = sender.split('@')[0];
+    const ownerNum = normalizedOwner.split('@')[0];
     
-    if (context.sender !== normalizedOwner) {
+    return senderNumber === ownerNum;
+};
+
+const sudo = async (sock, msg, args, context) => {
+    if (!isOwner(context.sender)) {
         return await sock.sendMessage(context.from, {
             text: '❌ Only the bot owner can use sudo commands'
         });
@@ -273,5 +272,6 @@ const isSudo = (userId) => {
 module.exports = {
     command: 'sudo',
     handler: sudo,
-    isSudo
+    isSudo,
+    isOwner
 };
