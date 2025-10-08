@@ -1,7 +1,10 @@
 const blockUser = async (sock, msg, args, context) => {
-    const OWNER_ID = '2348064610975@s.whatsapp.net';
+    const ownerNumber = process.env.OWNER_NUMBER;
+    const normalizedOwner = ownerNumber.includes('@') 
+        ? ownerNumber 
+        : `${ownerNumber}@s.whatsapp.net`;
     
-    if (context.sender !== OWNER_ID) {
+    if (context.sender !== normalizedOwner) {
         return await sock.sendMessage(context.from, { 
             text: '❌ Only the bot owner can block users' 
         });
@@ -12,7 +15,7 @@ const blockUser = async (sock, msg, args, context) => {
     
     if (!quotedMsg && !args[0]) {
         return await sock.sendMessage(context.from, { 
-            text: '❌ Reply to user\'s message or provide their number\n\nExample: block +2348012345678' 
+            text: `❌ Reply to user's message or provide their number\n\nExample: ${context.prefix}block +2348012345678` 
         });
     }
     
@@ -26,7 +29,7 @@ const blockUser = async (sock, msg, args, context) => {
             userToBlock = number + '@s.whatsapp.net';
         }
         
-        if (userToBlock === OWNER_ID) {
+        if (userToBlock === normalizedOwner) {
             return await sock.sendMessage(context.from, { 
                 text: '❌ You cannot block yourself' 
             });
@@ -48,9 +51,12 @@ const blockUser = async (sock, msg, args, context) => {
 };
 
 const unblockUser = async (sock, msg, args, context) => {
-    const OWNER_ID = '2348064610975@s.whatsapp.net';
+    const ownerNumber = process.env.OWNER_NUMBER;
+    const normalizedOwner = ownerNumber.includes('@') 
+        ? ownerNumber 
+        : `${ownerNumber}@s.whatsapp.net`;
     
-    if (context.sender !== OWNER_ID) {
+    if (context.sender !== normalizedOwner) {
         return await sock.sendMessage(context.from, { 
             text: '❌ Only the bot owner can unblock users' 
         });
@@ -61,7 +67,7 @@ const unblockUser = async (sock, msg, args, context) => {
     
     if (!quotedMsg && !args[0]) {
         return await sock.sendMessage(context.from, { 
-            text: '❌ Reply to user\'s message or provide their number\n\nExample: unblock +2348012345678' 
+            text: `❌ Reply to user's message or provide their number\n\nExample: ${context.prefix}unblock +2348012345678` 
         });
     }
     
