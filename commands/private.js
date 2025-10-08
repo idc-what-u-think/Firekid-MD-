@@ -39,20 +39,22 @@ const savePrivateMode = (enabled) => {
     }
 };
 
-const private = async (sock, msg, args, context) => {
+const isOwner = (sender) => {
     const ownerNumber = process.env.OWNER_NUMBER;
-    
-    if (!ownerNumber) {
-        return await sock.sendMessage(context.from, {
-            text: '❌ OWNER_NUMBER not configured in environment variables'
-        });
-    }
+    if (!ownerNumber) return false;
     
     const normalizedOwner = ownerNumber.includes('@') 
         ? ownerNumber 
         : `${ownerNumber}@s.whatsapp.net`;
     
-    if (context.sender !== normalizedOwner) {
+    const senderNumber = sender.split('@')[0];
+    const ownerNum = normalizedOwner.split('@')[0];
+    
+    return senderNumber === ownerNum;
+};
+
+const privateCmd = async (sock, msg, args, context) => {
+    if (!isOwner(context.sender)) {
         return await sock.sendMessage(context.from, {
             text: '❌ This command is only available to the bot owner'
         });
@@ -116,7 +118,7 @@ const private = async (sock, msg, args, context) => {
 
 module.exports = {
     command: 'private',
-    handler: private,
+    handler: privateCmd,
     isPrivateModeEnabled: () => {
         const config = loadPrivateMode();
         return config.enabled;
