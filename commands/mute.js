@@ -23,36 +23,60 @@ const mute = async (sock, msg, args, context) => {
             const pNum = p.id.split('@')[0].split(':')[0];
             return pNum === senderNumber;
         });
-        const isAdmin = senderParticipant && (senderParticipant.admin === 'admin' || senderParticipant.admin === 'superadmin');
+        const isSenderAdmin = senderParticipant && (senderParticipant.admin === 'admin' || senderParticipant.admin === 'superadmin');
         
         const botNumber = sock.user.id.split(':')[0];
         const botParticipant = groupMetadata.participants.find(p => {
             const pNum = p.id.split('@')[0].split(':')[0];
             return pNum === botNumber;
         });
-        const botAdmin = botParticipant && (botParticipant.admin === 'admin' || botParticipant.admin === 'superadmin');
+        const isBotAdmin = botParticipant && (botParticipant.admin === 'admin' || botParticipant.admin === 'superadmin');
         
-        if (!isAdmin && !isOwner(context.sender)) {
+        if (!isBotAdmin) {
+            return await sock.sendMessage(context.from, { 
+                text: '❌ Bot must be admin to mute group' 
+            });
+        }
+
+        if (!isSenderAdmin && !isOwner(context.sender)) {
             return await sock.sendMessage(context.from, { 
                 text: '❌ This command is only for admins' 
             });
         }
         
-        if (!botAdmin) {
-            return await sock.sendMessage(context.from, { 
-                text: '❌ Bot must be admin to mute group' 
-            });
-        }
+        const durationInMinutes = args[0] ? parseInt(args[0]) : undefined;
         
         await sock.groupSettingUpdate(context.from, 'announcement');
         
-        const time = new Date().toLocaleTimeString();
-        const muteMsg = `🔇 Group has been muted by @${senderNumber}\nTime: ${time}`;
-        
-        await sock.sendMessage(context.from, {
-            text: muteMsg,
-            mentions: [context.sender]
-        });
+        if (durationInMinutes !== undefined && durationInMinutes > 0 && !isNaN(durationInMinutes)) {
+            const durationInMilliseconds = durationInMinutes * 60 * 1000;
+            const time = new Date().toLocaleTimeString();
+            const muteMsg = `🔇 Group has been muted by @${senderNumber} for ${durationInMinutes} minutes\nTime: ${time}`;
+            
+            await sock.sendMessage(context.from, {
+                text: muteMsg,
+                mentions: [context.sender]
+            });
+            
+            setTimeout(async () => {
+                try {
+                    await sock.groupSettingUpdate(context.from, 'not_announcement');
+                    await sock.sendMessage(context.from, { 
+                        text: '🔊 The group has been unmuted automatically.' 
+                    });
+                } catch (unmuteError) {
+                    console.error('Error unmuting group:', unmuteError);
+                }
+            }, durationInMilliseconds);
+        } else {
+            const time = new Date().toLocaleTimeString();
+            const muteMsg = `🔇 Group has been muted by @${senderNumber}\nTime: ${time}`;
+            
+            await sock.sendMessage(context.from, {
+                text: muteMsg,
+                mentions: [context.sender]
+            });
+        }
         
     } catch (error) {
         console.error('Error in mute command:', error.message);
