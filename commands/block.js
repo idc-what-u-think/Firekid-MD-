@@ -1,8 +1,18 @@
 const blockUser = async (sock, msg, args, context) => {
     const ownerNumber = process.env.OWNER_NUMBER;
+    
+    if (!ownerNumber) {
+        return await sock.sendMessage(context.from, { 
+            text: '❌ OWNER_NUMBER not configured' 
+        });
+    }
+    
     const normalizedOwner = ownerNumber.includes('@') 
         ? ownerNumber 
         : `${ownerNumber}@s.whatsapp.net`;
+    
+    console.log('Sender:', context.sender);
+    console.log('Owner:', normalizedOwner);
     
     if (context.sender !== normalizedOwner) {
         return await sock.sendMessage(context.from, { 
@@ -15,7 +25,7 @@ const blockUser = async (sock, msg, args, context) => {
     
     if (!quotedMsg && !args[0]) {
         return await sock.sendMessage(context.from, { 
-            text: `❌ Reply to user's message or provide their number\n\nExample: ${context.prefix}block +2348012345678` 
+            text: `❌ Reply to user's message or provide their number\n\nExample: ${context.prefix}block 2348012345678` 
         });
     }
     
@@ -25,8 +35,12 @@ const blockUser = async (sock, msg, args, context) => {
         if (quotedSender) {
             userToBlock = quotedSender;
         } else if (args[0]) {
-            const number = args[0].replace(/[^0-9]/g, '');
-            userToBlock = number + '@s.whatsapp.net';
+            let number = args[0].replace(/[^0-9]/g, '');
+            if (!number.includes('@')) {
+                userToBlock = number + '@s.whatsapp.net';
+            } else {
+                userToBlock = number;
+            }
         }
         
         if (userToBlock === normalizedOwner) {
@@ -43,15 +57,22 @@ const blockUser = async (sock, msg, args, context) => {
         });
         
     } catch (error) {
-        console.error('Error in block command:', error);
+        console.error('Error in block command:', error.message);
         return await sock.sendMessage(context.from, { 
-            text: '❌ Failed to block user. Make sure the number is valid.' 
+            text: `❌ Failed to block user: ${error.message}` 
         });
     }
 };
 
 const unblockUser = async (sock, msg, args, context) => {
     const ownerNumber = process.env.OWNER_NUMBER;
+    
+    if (!ownerNumber) {
+        return await sock.sendMessage(context.from, { 
+            text: '❌ OWNER_NUMBER not configured' 
+        });
+    }
+    
     const normalizedOwner = ownerNumber.includes('@') 
         ? ownerNumber 
         : `${ownerNumber}@s.whatsapp.net`;
@@ -67,7 +88,7 @@ const unblockUser = async (sock, msg, args, context) => {
     
     if (!quotedMsg && !args[0]) {
         return await sock.sendMessage(context.from, { 
-            text: `❌ Reply to user's message or provide their number\n\nExample: ${context.prefix}unblock +2348012345678` 
+            text: `❌ Reply to user's message or provide their number\n\nExample: ${context.prefix}unblock 2348012345678` 
         });
     }
     
@@ -77,8 +98,12 @@ const unblockUser = async (sock, msg, args, context) => {
         if (quotedSender) {
             userToUnblock = quotedSender;
         } else if (args[0]) {
-            const number = args[0].replace(/[^0-9]/g, '');
-            userToUnblock = number + '@s.whatsapp.net';
+            let number = args[0].replace(/[^0-9]/g, '');
+            if (!number.includes('@')) {
+                userToUnblock = number + '@s.whatsapp.net';
+            } else {
+                userToUnblock = number;
+            }
         }
         
         await sock.updateBlockStatus(userToUnblock, 'unblock');
@@ -89,9 +114,9 @@ const unblockUser = async (sock, msg, args, context) => {
         });
         
     } catch (error) {
-        console.error('Error in unblock command:', error);
+        console.error('Error in unblock command:', error.message);
         return await sock.sendMessage(context.from, { 
-            text: '❌ Failed to unblock user. Make sure the number is valid.' 
+            text: `❌ Failed to unblock user: ${error.message}` 
         });
     }
 };
