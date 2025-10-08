@@ -1,27 +1,40 @@
 const fs = require('fs');
 const path = require('path');
 
-const CONFIG_FILE = path.join(__dirname, 'private_mode.json');
+const DATA_DIR = path.join(process.cwd(), 'data');
+const CONFIG_FILE = path.join(DATA_DIR, 'private_mode.json');
+
+const ensureDataDir = () => {
+    try {
+        if (!fs.existsSync(DATA_DIR)) {
+            fs.mkdirSync(DATA_DIR, { recursive: true });
+        }
+    } catch (error) {
+        console.error('Error creating data directory:', error.message);
+    }
+};
 
 const loadPrivateMode = () => {
     try {
+        ensureDataDir();
         if (fs.existsSync(CONFIG_FILE)) {
             const data = fs.readFileSync(CONFIG_FILE, 'utf8');
             return JSON.parse(data);
         }
         return { enabled: false };
     } catch (error) {
-        console.error('Error loading private mode:', error);
+        console.error('Error loading private mode:', error.message);
         return { enabled: false };
     }
 };
 
 const savePrivateMode = (enabled) => {
     try {
+        ensureDataDir();
         fs.writeFileSync(CONFIG_FILE, JSON.stringify({ enabled }, null, 2));
         return true;
     } catch (error) {
-        console.error('Error saving private mode:', error);
+        console.error('Error saving private mode:', error.message);
         return false;
     }
 };
