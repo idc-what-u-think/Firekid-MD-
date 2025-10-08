@@ -11,25 +11,25 @@ const menu = async (sock, msg, args, context) => {
         month: 'long',
         day: 'numeric'
     });
-    
+
     const formatUptime = (seconds) => {
         const days = Math.floor(seconds / 86400);
         const hours = Math.floor((seconds % 86400) / 3600);
         const minutes = Math.floor((seconds % 3600) / 60);
         const secs = Math.floor(seconds % 60);
-        
+
         let result = [];
         if (days > 0) result.push(`${days}d`);
         if (hours > 0) result.push(`${hours}h`);
         if (minutes > 0) result.push(`${minutes}m`);
         if (secs > 0 || result.length === 0) result.push(`${secs}s`);
-        
+
         return result.join(' ');
     };
-    
+
     const uptime = formatUptime(process.uptime());
     const ping = Math.abs(Date.now() - (msg.messageTimestamp * 1000));
-    
+
     const menuText = `╭━━━『 *FIREKID XMD* 』━━━╮
 │
 │ 👤 *User:* ${user}
@@ -105,6 +105,7 @@ const menu = async (sock, msg, args, context) => {
 │ • sudo - Manage sudo users
 │ • block - Block users
 │ • unlock - Unblock users
+│ • private - Private mode toggle
 │
 ╰━━━━━━━━━━━━━━━━━━━━╯
 
