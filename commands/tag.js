@@ -1,26 +1,49 @@
- const tag = async (m, client) => {
-    if (!m.isGroup) return m.reply('❌ This command is only for groups')
+const tag = async (sock, msg, args, context) => {
+    if (!context.isGroup) {
+        return await sock.sendMessage(context.from, {
+            text: '❌ This command is only for groups'
+        });
+    }
+    
+    const OWNER_ID = '2348064610975@s.whatsapp.net';
     
     try {
-        const message = m.args.join(' ')
-        if (!message) return m.reply('❌ Please provide a message to tag')
-
-        // Get all group participants
-        const groupMetadata = await client.groupMetadata(m.chat)
-        const participants = groupMetadata.participants.map(p => p.id)
-
-        // Send message with all participants mentioned
-        await client.sendMessage(m.chat, {
+        const groupMetadata = await sock.groupMetadata(context.from);
+        const botNumber = sock.user.id.split(':')[0] + '@s.whatsapp.net';
+        const participant = groupMetadata.participants.find(p => p.id === context.sender);
+        const isAdmin = participant?.admin === 'admin' || participant?.admin === 'superadmin';
+        const isOwner = context.sender === OWNER_ID;
+        
+        if (!isAdmin && !isOwner) {
+            return await sock.sendMessage(context.from, {
+                text: '❌ Only group admins can use this command'
+            });
+        }
+        
+        const message = args.join(' ');
+        
+        if (!message) {
+            return await sock.sendMessage(context.from, {
+                text: '❌ Please provide a message to tag\n\nExample: tag Hello everyone!'
+            });
+        }
+        
+        const participants = groupMetadata.participants.map(p => p.id);
+        
+        await sock.sendMessage(context.from, {
             text: message,
             mentions: participants
-        })
+        });
+        
     } catch (error) {
-        console.error('Error in tag command:', error)
-        return m.reply('❌ Failed to tag message')
+        console.error('Error in tag command:', error);
+        return await sock.sendMessage(context.from, {
+            text: '❌ Failed to tag message'
+        });
     }
-}
+};
 
 module.exports = {
     command: 'tag',
     handler: tag
-}
+};
