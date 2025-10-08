@@ -10,15 +10,13 @@ const setGroupPP = async (sock, msg, args, context) => {
     try {
         const groupMetadata = await sock.groupMetadata(context.from);
         
-        const senderParticipant = groupMetadata.participants.find(p => p.id === context.sender);
+        const senderNumber = context.sender.split('@')[0];
+        const senderParticipant = groupMetadata.participants.find(p => p.id.split('@')[0] === senderNumber);
         const isAdmin = senderParticipant && (senderParticipant.admin === 'admin' || senderParticipant.admin === 'superadmin');
         
-        const botId = sock.user.id.split(':')[0] + '@s.whatsapp.net';
-        const botParticipant = groupMetadata.participants.find(p => p.id === botId);
+        const botNumber = sock.user.id.split(':')[0];
+        const botParticipant = groupMetadata.participants.find(p => p.id.split('@')[0] === botNumber);
         const botAdmin = botParticipant && (botParticipant.admin === 'admin' || botParticipant.admin === 'superadmin');
-        
-        console.log('Sender:', context.sender, 'IsAdmin:', isAdmin);
-        console.log('Bot ID:', botId, 'IsBotAdmin:', botAdmin);
         
         if (!isAdmin) {
             return await sock.sendMessage(context.from, { 
