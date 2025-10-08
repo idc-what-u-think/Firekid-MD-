@@ -1,108 +1,117 @@
-const vv = async (m, client) => {
+const vv = async (sock, msg, args, context) => {
     try {
-        if (!m.quoted) return m.reply('❌ Reply to a view once message or status')
+        const quotedMsg = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
         
-        // Check if it's a view once message or status
-        if (m.quoted.mtype === 'viewOnceMessage' || m.quoted.mtype === 'status') {
+        if (!quotedMsg) {
+            return await sock.sendMessage(context.from, {
+                text: '❌ Reply to a view once message or status'
+            });
+        }
+        
+        if (quotedMsg.viewOnceMessage || quotedMsg.viewOnceMessageV2) {
+            const viewOnceMsg = quotedMsg.viewOnceMessage?.message || quotedMsg.viewOnceMessageV2?.message;
             
-            // Download the media
-            const mediaBuffer = await client.downloadAndSaveMediaMessage(m.quoted)
-            
-            // Get the actual message content from view once wrapper
-            let actualMessage = m.quoted
-            if (m.quoted.mtype === 'viewOnceMessage') {
-                actualMessage = m.quoted.message?.viewOnceMessage?.message || m.quoted
+            if (!viewOnceMsg) {
+                return await sock.sendMessage(context.from, {
+                    text: '❌ Could not extract view once content'
+                });
             }
             
-            // Determine media type and send accordingly
-            if (actualMessage.imageMessage) {
-                // Handle images
-                const caption = actualMessage.imageMessage.caption || '📸 View once image revealed'
-                await client.sendMessage(m.chat, { 
-                    image: { url: mediaBuffer },
+            if (viewOnceMsg.imageMessage) {
+                const caption = viewOnceMsg.imageMessage.caption || '📸 View once image revealed';
+                const buffer = await sock.downloadMediaMessage(msg.message.extendedTextMessage.contextInfo);
+                
+                await sock.sendMessage(context.from, { 
+                    image: buffer,
                     caption: caption 
-                }, { quoted: m })
+                }, { quoted: msg });
                 
-            } else if (actualMessage.videoMessage) {
-                // Handle videos
-                const caption = actualMessage.videoMessage.caption || '🎥 View once video revealed'
-                await client.sendMessage(m.chat, { 
-                    video: { url: mediaBuffer },
+            } else if (viewOnceMsg.videoMessage) {
+                const caption = viewOnceMsg.videoMessage.caption || '🎥 View once video revealed';
+                const buffer = await sock.downloadMediaMessage(msg.message.extendedTextMessage.contextInfo);
+                
+                await sock.sendMessage(context.from, { 
+                    video: buffer,
                     caption: caption,
-                    mimetype: actualMessage.videoMessage.mimetype || 'video/mp4'
-                }, { quoted: m })
+                    mimetype: viewOnceMsg.videoMessage.mimetype || 'video/mp4'
+                }, { quoted: msg });
                 
-            } else if (actualMessage.audioMessage) {
-                // Handle audio messages
-                await client.sendMessage(m.chat, { 
-                    audio: { url: mediaBuffer },
-                    mimetype: actualMessage.audioMessage.mimetype || 'audio/mp4',
-                    ptt: actualMessage.audioMessage.ptt || false // Voice note or regular audio
-                }, { quoted: m })
+            } else if (viewOnceMsg.audioMessage) {
+                const buffer = await sock.downloadMediaMessage(msg.message.extendedTextMessage.contextInfo);
                 
-            } else if (actualMessage.documentMessage) {
-                // Handle documents
-                const fileName = actualMessage.documentMessage.fileName || 'view_once_document'
-                await client.sendMessage(m.chat, { 
-                    document: { url: mediaBuffer },
-                    mimetype: actualMessage.documentMessage.mimetype || 'application/octet-stream',
+                await sock.sendMessage(context.from, { 
+                    audio: buffer,
+                    mimetype: viewOnceMsg.audioMessage.mimetype || 'audio/mp4',
+                    ptt: viewOnceMsg.audioMessage.ptt || false
+                }, { quoted: msg });
+                
+            } else if (viewOnceMsg.documentMessage) {
+                const fileName = viewOnceMsg.documentMessage.fileName || 'view_once_document';
+                const buffer = await sock.downloadMediaMessage(msg.message.extendedTextMessage.contextInfo);
+                
+                await sock.sendMessage(context.from, { 
+                    document: buffer,
+                    mimetype: viewOnceMsg.documentMessage.mimetype || 'application/octet-stream',
                     fileName: fileName,
                     caption: '📄 View once document revealed'
-                }, { quoted: m })
+                }, { quoted: msg });
                 
-            } else if (actualMessage.stickerMessage) {
-                // Handle stickers
-                await client.sendMessage(m.chat, { 
-                    sticker: { url: mediaBuffer }
-                }, { quoted: m })
+            } else if (viewOnceMsg.stickerMessage) {
+                const buffer = await sock.downloadMediaMessage(msg.message.extendedTextMessage.contextInfo);
                 
-            } else if (actualMessage.gifMessage) {
-                // Handle GIFs
-                const caption = actualMessage.gifMessage.caption || '🎞️ View once GIF revealed'
-                await client.sendMessage(m.chat, { 
-                    video: { url: mediaBuffer },
-                    gifPlayback: true,
-                    caption: caption
-                }, { quoted: m })
+                await sock.sendMessage(context.from, { 
+                    sticker: buffer
+                }, { quoted: msg });
                 
             } else {
-                // Fallback - try to send as image first, then as document
                 try {
-                    await client.sendMessage(m.chat, { 
-                        image: { url: mediaBuffer },
+                    const buffer = await sock.downloadMediaMessage(msg.message.extendedTextMessage.contextInfo);
+                    
+                    await sock.sendMessage(context.from, { 
+                        image: buffer,
                         caption: '📱 View once media revealed (unknown type)'
-                    }, { quoted: m })
+                    }, { quoted: msg });
                 } catch {
-                    await client.sendMessage(m.chat, { 
-                        document: { url: mediaBuffer },
+                    const buffer = await sock.downloadMediaMessage(msg.message.extendedTextMessage.contextInfo);
+                    
+                    await sock.sendMessage(context.from, { 
+                        document: buffer,
                         fileName: 'view_once_media',
                         caption: '📱 View once media revealed'
-                    }, { quoted: m })
+                    }, { quoted: msg });
                 }
             }
             
-            // Success message
-            await m.reply('✅ View once media revealed successfully!')
+            await sock.sendMessage(context.from, {
+                text: '✅ View once media revealed successfully!'
+            });
             
         } else {
-            return m.reply('❌ This is not a view once message or status\n\nSupported types:\n• View once photos\n• View once videos\n• View once documents\n• WhatsApp status')
+            return await sock.sendMessage(context.from, {
+                text: '❌ This is not a view once message or status\n\nSupported types:\n• View once photos\n• View once videos\n• View once documents\n• WhatsApp status'
+            });
         }
         
     } catch (error) {
-        console.error('Error in vv command:', error)
+        console.error('Error in vv command:', error);
         
-        // More specific error messages
         if (error.message?.includes('download')) {
-            return m.reply('❌ Failed to download media. The message might be expired or corrupted.')
+            return await sock.sendMessage(context.from, {
+                text: '❌ Failed to download media. The message might be expired or corrupted.'
+            });
         } else if (error.message?.includes('send')) {
-            return m.reply('❌ Downloaded successfully but failed to send. Media might be too large.')
+            return await sock.sendMessage(context.from, {
+                text: '❌ Downloaded successfully but failed to send. Media might be too large.'
+            });
         } else {
-            return m.reply('❌ Failed to process view once message. Please try again.')
+            return await sock.sendMessage(context.from, {
+                text: '❌ Failed to process view once message. Please try again.'
+            });
         }
     }
-}
+};
 
 module.exports = {
     command: 'vv',
     handler: vv
-}
+};
