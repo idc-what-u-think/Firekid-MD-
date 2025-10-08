@@ -1,12 +1,13 @@
 const fs = require('fs');
 const path = require('path');
 
-const SUDO_FILE = path.join(__dirname, 'sudo_users.json');
+const DATA_DIR = path.join(process.cwd(), 'data');
+const SUDO_FILE = path.join(DATA_DIR, 'sudo_users.json');
 
 const countryCodes = {
     '1': 'US/Canada',
     '44': 'UK',
-    '49': 'Germany', 
+    '49': 'Germany',
     '33': 'France',
     '39': 'Italy',
     '34': 'Spain',
@@ -44,8 +45,19 @@ const countryCodes = {
     '64': 'New Zealand'
 };
 
+const ensureDataDir = () => {
+    try {
+        if (!fs.existsSync(DATA_DIR)) {
+            fs.mkdirSync(DATA_DIR, { recursive: true });
+        }
+    } catch (error) {
+        console.error('Error creating data directory:', error.message);
+    }
+};
+
 const loadSudoUsers = () => {
     try {
+        ensureDataDir();
         if (fs.existsSync(SUDO_FILE)) {
             const data = fs.readFileSync(SUDO_FILE, 'utf8');
             const parsed = JSON.parse(data);
@@ -53,13 +65,14 @@ const loadSudoUsers = () => {
         }
         return new Set();
     } catch (error) {
-        console.error('Error loading sudo users:', error);
+        console.error('Error loading sudo users:', error.message);
         return new Set();
     }
 };
 
 const saveSudoUsers = (users) => {
     try {
+        ensureDataDir();
         const data = {
             users: Array.from(users),
             lastUpdated: new Date().toISOString()
@@ -67,7 +80,7 @@ const saveSudoUsers = (users) => {
         fs.writeFileSync(SUDO_FILE, JSON.stringify(data, null, 2));
         return true;
     } catch (error) {
-        console.error('Error saving sudo users:', error);
+        console.error('Error saving sudo users:', error.message);
         return false;
     }
 };
@@ -119,6 +132,9 @@ const sudo = async (sock, msg, args, context) => {
         ? ownerNumber 
         : `${ownerNumber}@s.whatsapp.net`;
     
+    console.log('Sender:', context.sender);
+    console.log('Owner:', normalizedOwner);
+    
     if (context.sender !== normalizedOwner) {
         return await sock.sendMessage(context.from, {
             text: '❌ Only the bot owner can use sudo commands'
@@ -136,10 +152,10 @@ const sudo = async (sock, msg, args, context) => {
 *sudo list* - List all sudo users
 
 📝 Number formats supported:
-• +234801234567 (with country code)
-• 08012345678 (Nigerian local)
-• 081234567890 (Indonesian local)
-• 2348012345678 (international without +)`
+- +234801234567 (with country code)
+- 08012345678 (Nigerian local)
+- 081234567890 (Indonesian local)
+- 2348012345678 (international without +)`
         });
     }
 
@@ -243,9 +259,9 @@ const sudo = async (sock, msg, args, context) => {
                 });
         }
     } catch (error) {
-        console.error('Error in sudo command:', error);
+        console.error('Error in sudo command:', error.message);
         return await sock.sendMessage(context.from, {
-            text: '❌ Failed to process sudo command'
+            text: `❌ Failed to process sudo command: ${error.message}`
         });
     }
 };
