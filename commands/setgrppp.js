@@ -1,4 +1,6 @@
-const { downloadMediaMessage } = require('@whiskeysockets/baileys');
+const fs = require('fs');
+const path = require('path');
+const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
 
 const isOwner = (sender) => {
     const ownerNumber = process.env.OWNER_NUMBER;
@@ -14,7 +16,7 @@ const setGroupPP = async (sock, msg, args, context) => {
     if (!context.isGroup) {
         return await sock.sendMessage(context.from, { 
             text: '❌ This command is only for groups' 
-        });
+        }, { quoted: msg });
     }
     
     try {
@@ -34,48 +36,55 @@ const setGroupPP = async (sock, msg, args, context) => {
         });
         const botAdmin = botParticipant && (botParticipant.admin === 'admin' || botParticipant.admin === 'superadmin');
         
-        if (!isAdmin && !isOwner(context.sender)) {
-            return await sock.sendMessage(context.from, { 
-                text: '❌ This command is only for admins' 
-            });
-        }
-        
         if (!botAdmin) {
             return await sock.sendMessage(context.from, { 
                 text: '❌ Bot must be admin to change group picture' 
-            });
+            }, { quoted: msg });
+        }
+
+        if (!isAdmin && !isOwner(context.sender)) {
+            return await sock.sendMessage(context.from, { 
+                text: '❌ This command is only for admins' 
+            }, { quoted: msg });
         }
         
         const quotedMsg = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
-        const imageMessage = quotedMsg?.imageMessage;
+        const imageMessage = quotedMsg?.imageMessage || quotedMsg?.stickerMessage;
         
         if (!imageMessage) {
             return await sock.sendMessage(context.from, { 
                 text: '❌ Reply to an image to set as group picture' 
-            });
+            }, { quoted: msg });
         }
         
-        const buffer = await downloadMediaMessage(
-            { message: quotedMsg },
-            'buffer',
-            {},
-            { 
-                logger: { info() {}, error() {}, warn() {}, trace() {}, debug() {} },
-                reuploadRequest: sock.updateMediaMessage
-            }
-        );
+        const tmpDir = path.join(process.cwd(), 'tmp');
+        if (!fs.existsSync(tmpDir)) {
+            fs.mkdirSync(tmpDir, { recursive: true });
+        }
         
-        await sock.updateProfilePicture(context.from, buffer);
+        const stream = await downloadContentFromMessage(imageMessage, 'image');
+        let buffer = Buffer.from([]);
+        
+        for await (const chunk of stream) {
+            buffer = Buffer.concat([buffer, chunk]);
+        }
+        
+        const imagePath = path.join(tmpDir, `group_profile_${Date.now()}.jpg`);
+        fs.writeFileSync(imagePath, buffer);
+        
+        await sock.updateProfilePicture(context.from, { url: imagePath });
+        
+        fs.unlinkSync(imagePath);
         
         await sock.sendMessage(context.from, { 
-            text: '✅ Group picture has been updated' 
-        });
+            text: '✅ Group picture has been updated successfully!' 
+        }, { quoted: msg });
         
     } catch (error) {
         console.error('Error in setgrppp command:', error.message);
         return await sock.sendMessage(context.from, { 
             text: `❌ Failed to update group picture: ${error.message}` 
-        });
+        }, { quoted: msg });
     }
 };
 
