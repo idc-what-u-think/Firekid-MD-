@@ -1,21 +1,31 @@
-const online = async (m, client) => {
-    if (!m.args[0]) return m.reply('❌ Usage: .online on/off')
+const online = async (sock, msg, args, context) => {
+    if (!args[0]) {
+        return await sock.sendMessage(context.from, {
+            text: '❌ Usage: .online on/off'
+        });
+    }
     
-    const setting = m.args[0].toLowerCase()
+    const setting = args[0].toLowerCase();
     if (!['on', 'off'].includes(setting)) {
-        return m.reply('❌ Invalid option. Use on or off')
+        return await sock.sendMessage(context.from, {
+            text: '❌ Invalid option. Use on or off'
+        });
     }
-
+    
     try {
-        client.autoRead = setting === 'on'
-        return m.reply(`✅ Auto-read has been turned ${setting}`)
+        sock.autoRead = setting === 'on';
+        return await sock.sendMessage(context.from, {
+            text: `✅ Auto-read has been turned ${setting}`
+        });
     } catch (error) {
-        console.error('Error in online command:', error)
-        return m.reply('❌ Failed to update auto-read settings')
+        console.error('Error in online command:', error);
+        return await sock.sendMessage(context.from, {
+            text: '❌ Failed to update auto-read settings'
+        });
     }
-}
+};
 
 module.exports = {
     command: 'online',
     handler: online
-}
+};
