@@ -88,10 +88,9 @@ const saveSudoUsers = (users) => {
 let sudoUsers = loadSudoUsers();
 
 const formatPhoneNumber = (number) => {
-    let cleaned = number.replace(/[^0-9]/g, '');
+    const cleaned = number.replace(/[^0-9]/g, '');
     
     if (number.startsWith('+')) {
-        cleaned = number.slice(1).replace(/[^0-9]/g, '');
         return cleaned + '@s.whatsapp.net';
     }
     
@@ -100,15 +99,12 @@ const formatPhoneNumber = (number) => {
     }
     
     if (cleaned.startsWith('0')) {
-        if (cleaned.length === 11) {
-            if (cleaned.match(/^0[7-9][0-1]/)) {
-                return '234' + cleaned.slice(1) + '@s.whatsapp.net';
-            }
-            if (cleaned.startsWith('08')) {
-                return '62' + cleaned.slice(1) + '@s.whatsapp.net';
-            }
+        if (cleaned.length === 11 && cleaned.match(/^0[7-9][0-1]/)) {
+            return '234' + cleaned.slice(1) + '@s.whatsapp.net';
         }
-        
+        if (cleaned.startsWith('08')) {
+            return '62' + cleaned.slice(1) + '@s.whatsapp.net';
+        }
         return '62' + cleaned.slice(1) + '@s.whatsapp.net';
     }
     
@@ -129,135 +125,148 @@ const isOwner = (sender) => {
     return senderNumber === ownerNum;
 };
 
-const sudo = async (sock, msg, args, context) => {
-    if (!isOwner(context.sender)) {
-        return await sock.sendMessage(context.from, {
-            text: '❌ Only the bot owner can use sudo commands'
-        });
-    }
-
-    const action = args[0];
-    const number = args.slice(1).join(' ');
+const extractMentionedJid = (msg) => {
+    const mentioned = msg.message?.extendedTextMessage?.contextInfo?.mentionedJid || [];
+    if (mentioned.length > 0) return mentioned[0];
     
-    if (!action) {
+    const quotedSender = msg.message?.extendedTextMessage?.contextInfo?.participant;
+    if (quotedSender) return quotedSender;
+    
+    return null;
+};
+
+const sudo = async (sock, msg, args, context) => {
+    const action = args[0]?.toLowerCase();
+    
+    if (!action || !['add', 'remove', 'del', 'list'].includes(action)) {
         return await sock.sendMessage(context.from, {
             text: `❌ Usage:
-*sudo add [number]* - Add sudo user
-*sudo remove [number]* - Remove sudo user  
-*sudo list* - List all sudo users
+*${context.prefix}sudo add <@user|number>* - Add sudo user
+*${context.prefix}sudo remove <@user|number>* - Remove sudo user  
+*${context.prefix}sudo list* - List all sudo users
 
 📝 Number formats supported:
 - +234801234567 (with country code)
 - 08012345678 (Nigerian local)
 - 081234567890 (Indonesian local)
-- 2348012345678 (international without +)`
-        });
+- 2348012345678 (international without +)
+- @mention user
+- Reply to user's message`
+        }, { quoted: msg });
     }
 
     try {
-        switch (action.toLowerCase()) {
-            case 'add':
-                if (!number) {
-                    return await sock.sendMessage(context.from, {
-                        text: '❌ Provide a phone number'
-                    });
-                }
-                
-                const formattedNum = formatPhoneNumber(number);
-                
-                if (sudoUsers.has(formattedNum)) {
-                    return await sock.sendMessage(context.from, {
-                        text: '⚠️ This number is already a sudo user'
-                    });
-                }
-
-                sudoUsers.add(formattedNum);
-                
-                if (!saveSudoUsers(sudoUsers)) {
-                    return await sock.sendMessage(context.from, {
-                        text: '❌ Failed to save sudo user'
-                    });
-                }
-                
-                const countryCode = formattedNum.split('@')[0];
-                let detectedCountry = 'Unknown';
-                
-                for (const [code, country] of Object.entries(countryCodes)) {
-                    if (countryCode.startsWith(code)) {
-                        detectedCountry = country;
-                        break;
-                    }
-                }
-                
+        if (action === 'list') {
+            if (sudoUsers.size === 0) {
                 return await sock.sendMessage(context.from, {
-                    text: `✅ Added *${number}* to sudo users
-🌍 Detected country: ${detectedCountry}
-📱 Formatted as: ${countryCode}
-💾 Saved to storage`
-                });
-
-            case 'remove':
-                if (!number) {
-                    return await sock.sendMessage(context.from, {
-                        text: '❌ Provide a phone number'
-                    });
-                }
-                
-                const formatNum = formatPhoneNumber(number);
-
-                if (sudoUsers.delete(formatNum)) {
-                    if (!saveSudoUsers(sudoUsers)) {
-                        sudoUsers.add(formatNum);
-                        return await sock.sendMessage(context.from, {
-                            text: '❌ Failed to save changes'
-                        });
+                    text: '📝 No sudo users found'
+                }, { quoted: msg });
+            }
+            
+            const list = Array.from(sudoUsers)
+                .map((num, index) => {
+                    const phoneNum = num.replace('@s.whatsapp.net', '');
+                    let country = 'Unknown';
+                    
+                    for (const [code, countryName] of Object.entries(countryCodes)) {
+                        if (phoneNum.startsWith(code)) {
+                            country = countryName;
+                            break;
+                        }
                     }
                     
-                    return await sock.sendMessage(context.from, {
-                        text: `✅ Removed *${number}* from sudo users`
-                    });
-                }
-                return await sock.sendMessage(context.from, {
-                    text: '❌ Number not found in sudo list'
-                });
-
-            case 'list':
-                if (sudoUsers.size === 0) {
-                    return await sock.sendMessage(context.from, {
-                        text: '📝 No sudo users found'
-                    });
-                }
-                
-                const list = Array.from(sudoUsers)
-                    .map((num, index) => {
-                        const phoneNum = num.replace('@s.whatsapp.net', '');
-                        let country = 'Unknown';
-                        
-                        for (const [code, countryName] of Object.entries(countryCodes)) {
-                            if (phoneNum.startsWith(code)) {
-                                country = countryName;
-                                break;
-                            }
-                        }
-                        
-                        return `${index + 1}. +${phoneNum} (${country})`;
-                    })
-                    .join('\n');
-                
-                return await sock.sendMessage(context.from, {
-                    text: `📝 *Sudo Users (${sudoUsers.size}):*\n\n${list}`
-                });
-
-            default:
-                return await sock.sendMessage(context.from, {
-                    text: '❌ Invalid action. Use *add*, *remove*, or *list*'
-                });
+                    return `${index + 1}. +${phoneNum} (${country})`;
+                })
+                .join('\n');
+            
+            return await sock.sendMessage(context.from, {
+                text: `📝 *Sudo Users (${sudoUsers.size}):*\n\n${list}`
+            }, { quoted: msg });
         }
+
+        if (!isOwner(context.sender)) {
+            return await sock.sendMessage(context.from, {
+                text: '❌ Only the bot owner can add/remove sudo users'
+            }, { quoted: msg });
+        }
+
+        let targetJid = extractMentionedJid(msg);
+        
+        if (!targetJid && args[1]) {
+            targetJid = formatPhoneNumber(args.slice(1).join(' '));
+        }
+        
+        if (!targetJid) {
+            return await sock.sendMessage(context.from, {
+                text: '❌ Please mention a user, reply to their message, or provide their number'
+            }, { quoted: msg });
+        }
+
+        if (action === 'add') {
+            if (sudoUsers.has(targetJid)) {
+                return await sock.sendMessage(context.from, {
+                    text: '⚠️ This user is already a sudo user'
+                }, { quoted: msg });
+            }
+
+            sudoUsers.add(targetJid);
+            
+            if (!saveSudoUsers(sudoUsers)) {
+                sudoUsers.delete(targetJid);
+                return await sock.sendMessage(context.from, {
+                    text: '❌ Failed to save sudo user'
+                }, { quoted: msg });
+            }
+            
+            const countryCode = targetJid.split('@')[0];
+            let detectedCountry = 'Unknown';
+            
+            for (const [code, country] of Object.entries(countryCodes)) {
+                if (countryCode.startsWith(code)) {
+                    detectedCountry = country;
+                    break;
+                }
+            }
+            
+            return await sock.sendMessage(context.from, {
+                text: `✅ Added sudo user successfully
+🌍 Detected country: ${detectedCountry}
+📱 Number: +${countryCode}
+💾 Saved to storage`
+            }, { quoted: msg });
+        }
+
+        if (action === 'remove' || action === 'del') {
+            if (isOwner(targetJid)) {
+                return await sock.sendMessage(context.from, {
+                    text: '❌ Owner cannot be removed from sudo'
+                }, { quoted: msg });
+            }
+
+            if (sudoUsers.delete(targetJid)) {
+                if (!saveSudoUsers(sudoUsers)) {
+                    sudoUsers.add(targetJid);
+                    return await sock.sendMessage(context.from, {
+                        text: '❌ Failed to save changes'
+                    }, { quoted: msg });
+                }
+                
+                const phoneNum = targetJid.replace('@s.whatsapp.net', '');
+                return await sock.sendMessage(context.from, {
+                    text: `✅ Removed sudo user successfully\n📱 Number: +${phoneNum}`
+                }, { quoted: msg });
+            }
+            
+            return await sock.sendMessage(context.from, {
+                text: '❌ User not found in sudo list'
+            }, { quoted: msg });
+        }
+
     } catch (error) {
         console.error('Error in sudo command:', error.message);
         return await sock.sendMessage(context.from, {
             text: `❌ Failed to process sudo command: ${error.message}`
-        });
+        }, { quoted: msg });
     }
 };
 
