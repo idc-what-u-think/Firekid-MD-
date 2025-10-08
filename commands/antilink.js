@@ -1,87 +1,66 @@
-let antilinkSettings = new Map();
+const { detectAndHandleLink } = require('./commands/antilink');
 
-const isAdmin = async (sock, groupId, userId) => {
-    try {
-        const groupMetadata = await sock.groupMetadata(groupId);
-        const participant = groupMetadata.participants.find(p => p.id === userId);
-        return participant?.admin ? true : false;
-    } catch {
-        return false;
-    }
-};
+sock.ev.on('messages.upsert', async ({ messages, type }) => {
+  if (type !== 'notify') return;
 
-const isBotAdmin = async (sock, groupId) => {
-    try {
-        const groupMetadata = await sock.groupMetadata(groupId);
-        const botId = sock.user.id.split(':')[0] + '@s.whatsapp.net';
-        const botParticipant = groupMetadata.participants.find(p => p.id === botId);
-        return botParticipant?.admin ? true : false;
-    } catch {
-        return false;
-    }
-};
+  for (const msg of messages) {
+    if (!msg.message) continue;
 
-const antilink = async (sock, msg, args, context) => {
-    if (!context.isGroup) {
-        return await sock.sendMessage(context.from, { 
-            text: '❌ This command is only for groups' 
-        });
+    const from = msg.key.remoteJid;
+    const isGroup = from.endsWith('@g.us');
+    const sender = msg.key.participant || from;
+    const messageText = msg.message.conversation || 
+                       msg.message.extendedTextMessage?.text || '';
+
+    if (!botState.isActive && sender !== 'admin') {
+      continue;
     }
+
+    if (!botState.users.has(sender)) {
+      botState.users.set(sender, {
+        id: sender,
+        firstSeen: new Date(),
+        lastSeen: new Date(),
+        messageCount: 0,
+      });
+    }
+    const user = botState.users.get(sender);
+    user.lastSeen = new Date();
+    user.messageCount++;
+
+    const context = {
+      from,
+      sender,
+      isGroup,
+      prefix: config.prefix,
+    };
     
-    if (!(await isAdmin(sock, context.from, context.sender))) {
-        return await sock.sendMessage(context.from, { 
-            text: '❌ This command is only for admins' 
-        });
-    }
-    
-    try {
-        const action = args[0]?.toLowerCase();
-        const mode = args[1]?.toLowerCase();
-        
-        if (!action || !['on', 'off'].includes(action)) {
-            return await sock.sendMessage(context.from, { 
-                text: `❌ Usage: 
-*antilnk on* (kick/delete) - Enable antilink
-*antilnk off* - Disable antilink
+    await detectAndHandleLink(sock, msg, context);
 
-Current modes:
-• *kick* - Kick user after 3 warnings
-• *delete* - Delete message and warn user` 
-            });
-        }
-        
-        if (action === 'on' && !['kick', 'delete'].includes(mode)) {
-            return await sock.sendMessage(context.from, { 
-                text: '❌ Please specify action: *kick* or *delete*' 
-            });
-        }
-        
-        if (action === 'on') {
-            if (mode === 'kick' && !(await isBotAdmin(sock, context.from))) {
-                return await sock.sendMessage(context.from, { 
-                    text: '❌ Bot needs admin privileges to kick members' 
-                });
-            }
-            
-            antilinkSettings.set(context.from, mode);
-            return await sock.sendMessage(context.from, { 
-                text: `✅ Antilink enabled with *${mode}* action\n\n💡 Tip: Use *allowdomain* command to whitelist trusted domains` 
-            });
-        } else {
-            antilinkSettings.delete(context.from);
-            return await sock.sendMessage(context.from, { 
-                text: '✅ Antilink disabled' 
-            });
-        }
-    } catch (error) {
-        console.error('Error in antilink command:', error);
-        return await sock.sendMessage(context.from, { 
-            text: '❌ Failed to update antilink settings' 
-        });
-    }
-};
+    if (!messageText.startsWith(config.prefix)) continue;
 
-module.exports = {
-    command: 'antilnk',
-    handler: antilink
-};
+    const args = messageText.slice(config.prefix.length).trim().split(/ +/);
+    const commandName = args.shift().toLowerCase();
+
+    const command = commands[commandName];
+    if (command && command.handler) {
+      try {
+        console.log(`🎯 Executing command: ${commandName} from ${sender}`);
+        botState.stats.totalCommands++;
+        botState.stats.commandsToday++;
+
+        await command.handler(sock, msg, args, {
+          from,
+          sender,
+          isGroup,
+          prefix: config.prefix,
+        });
+      } catch (error) {
+        console.error(`❌ Error executing command ${commandName}:`, error.message);
+        await sock.sendMessage(from, {
+          text: `⚠️ Error executing command: ${error.message}`,
+        });
+      }
+    }
+  }
+});
