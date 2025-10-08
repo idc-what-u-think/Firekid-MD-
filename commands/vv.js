@@ -8,8 +8,10 @@ const vv = async (sock, msg, args, context) => {
             });
         }
         
-        if (quotedMsg.viewOnceMessage || quotedMsg.viewOnceMessageV2) {
-            const viewOnceMsg = quotedMsg.viewOnceMessage?.message || quotedMsg.viewOnceMessageV2?.message;
+        if (quotedMsg.viewOnceMessage || quotedMsg.viewOnceMessageV2 || quotedMsg.viewOnceMessageV2Extension) {
+            const viewOnceMsg = quotedMsg.viewOnceMessage?.message || 
+                               quotedMsg.viewOnceMessageV2?.message || 
+                               quotedMsg.viewOnceMessageV2Extension?.message;
             
             if (!viewOnceMsg) {
                 return await sock.sendMessage(context.from, {
@@ -17,9 +19,25 @@ const vv = async (sock, msg, args, context) => {
                 });
             }
             
+            let buffer;
+            try {
+                const downloadMsg = {
+                    message: {
+                        extendedTextMessage: {
+                            contextInfo: msg.message.extendedTextMessage.contextInfo
+                        }
+                    }
+                };
+                buffer = await sock.downloadMediaMessage(downloadMsg);
+            } catch (e) {
+                console.error('Download error:', e);
+                return await sock.sendMessage(context.from, {
+                    text: '❌ Failed to download media. The message might be expired.'
+                });
+            }
+            
             if (viewOnceMsg.imageMessage) {
                 const caption = viewOnceMsg.imageMessage.caption || '📸 View once image revealed';
-                const buffer = await sock.downloadMediaMessage(msg.message.extendedTextMessage.contextInfo);
                 
                 await sock.sendMessage(context.from, { 
                     image: buffer,
@@ -28,7 +46,6 @@ const vv = async (sock, msg, args, context) => {
                 
             } else if (viewOnceMsg.videoMessage) {
                 const caption = viewOnceMsg.videoMessage.caption || '🎥 View once video revealed';
-                const buffer = await sock.downloadMediaMessage(msg.message.extendedTextMessage.contextInfo);
                 
                 await sock.sendMessage(context.from, { 
                     video: buffer,
@@ -37,8 +54,6 @@ const vv = async (sock, msg, args, context) => {
                 }, { quoted: msg });
                 
             } else if (viewOnceMsg.audioMessage) {
-                const buffer = await sock.downloadMediaMessage(msg.message.extendedTextMessage.contextInfo);
-                
                 await sock.sendMessage(context.from, { 
                     audio: buffer,
                     mimetype: viewOnceMsg.audioMessage.mimetype || 'audio/mp4',
@@ -47,7 +62,6 @@ const vv = async (sock, msg, args, context) => {
                 
             } else if (viewOnceMsg.documentMessage) {
                 const fileName = viewOnceMsg.documentMessage.fileName || 'view_once_document';
-                const buffer = await sock.downloadMediaMessage(msg.message.extendedTextMessage.contextInfo);
                 
                 await sock.sendMessage(context.from, { 
                     document: buffer,
@@ -57,23 +71,17 @@ const vv = async (sock, msg, args, context) => {
                 }, { quoted: msg });
                 
             } else if (viewOnceMsg.stickerMessage) {
-                const buffer = await sock.downloadMediaMessage(msg.message.extendedTextMessage.contextInfo);
-                
                 await sock.sendMessage(context.from, { 
                     sticker: buffer
                 }, { quoted: msg });
                 
             } else {
                 try {
-                    const buffer = await sock.downloadMediaMessage(msg.message.extendedTextMessage.contextInfo);
-                    
                     await sock.sendMessage(context.from, { 
                         image: buffer,
                         caption: '📱 View once media revealed (unknown type)'
                     }, { quoted: msg });
                 } catch {
-                    const buffer = await sock.downloadMediaMessage(msg.message.extendedTextMessage.contextInfo);
-                    
                     await sock.sendMessage(context.from, { 
                         document: buffer,
                         fileName: 'view_once_media',
