@@ -1,5 +1,4 @@
 const blockUser = async (sock, msg, args, context) => {
-    const quotedMsg = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
     const quotedSender = msg.message?.extendedTextMessage?.contextInfo?.participant;
     
     if (!quotedSender && !args[0]) {
@@ -28,7 +27,6 @@ const blockUser = async (sock, msg, args, context) => {
 };
 
 const unblockUser = async (sock, msg, args, context) => {
-    const quotedMsg = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
     const quotedSender = msg.message?.extendedTextMessage?.contextInfo?.participant;
     
     if (!quotedSender && !args[0]) {
@@ -49,7 +47,7 @@ const unblockUser = async (sock, msg, args, context) => {
             text: '✅ User has been unblocked' 
         });
     } catch (error) {
-        console.error('Error in unlock command:', error);
+        console.error('Error in unblock command:', error);
         return await sock.sendMessage(context.from, { 
             text: '❌ Failed to unblock user' 
         });
@@ -61,8 +59,8 @@ module.exports = {
         command: 'block',
         handler: blockUser
     },
-    unlock: {
-        command: 'unlock',
+    unblock: {
+        command: 'unblock',
         handler: unblockUser
     }
 };
