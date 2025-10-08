@@ -1,20 +1,19 @@
-const blockUser = async (sock, msg, args, context) => {
+const isOwner = (sender) => {
     const ownerNumber = process.env.OWNER_NUMBER;
-    
-    if (!ownerNumber) {
-        return await sock.sendMessage(context.from, { 
-            text: '❌ OWNER_NUMBER not configured' 
-        });
-    }
+    if (!ownerNumber) return false;
     
     const normalizedOwner = ownerNumber.includes('@') 
         ? ownerNumber 
         : `${ownerNumber}@s.whatsapp.net`;
     
-    console.log('Sender:', context.sender);
-    console.log('Owner:', normalizedOwner);
+    const senderNumber = sender.split('@')[0];
+    const ownerNum = normalizedOwner.split('@')[0];
     
-    if (context.sender !== normalizedOwner) {
+    return senderNumber === ownerNum;
+};
+
+const blockUser = async (sock, msg, args, context) => {
+    if (!isOwner(context.sender)) {
         return await sock.sendMessage(context.from, { 
             text: '❌ Only the bot owner can block users' 
         });
@@ -43,7 +42,7 @@ const blockUser = async (sock, msg, args, context) => {
             }
         }
         
-        if (userToBlock === normalizedOwner) {
+        if (isOwner(userToBlock)) {
             return await sock.sendMessage(context.from, { 
                 text: '❌ You cannot block yourself' 
             });
@@ -51,7 +50,7 @@ const blockUser = async (sock, msg, args, context) => {
         
         await sock.updateBlockStatus(userToBlock, 'block');
         
-        const phoneNum = userToBlock.replace('@s.whatsapp.net', '');
+        const phoneNum = userToBlock.replace(/@[^@]+$/, '');
         return await sock.sendMessage(context.from, { 
             text: `✅ User blocked successfully\n📱 Number: +${phoneNum}` 
         });
@@ -65,19 +64,7 @@ const blockUser = async (sock, msg, args, context) => {
 };
 
 const unblockUser = async (sock, msg, args, context) => {
-    const ownerNumber = process.env.OWNER_NUMBER;
-    
-    if (!ownerNumber) {
-        return await sock.sendMessage(context.from, { 
-            text: '❌ OWNER_NUMBER not configured' 
-        });
-    }
-    
-    const normalizedOwner = ownerNumber.includes('@') 
-        ? ownerNumber 
-        : `${ownerNumber}@s.whatsapp.net`;
-    
-    if (context.sender !== normalizedOwner) {
+    if (!isOwner(context.sender)) {
         return await sock.sendMessage(context.from, { 
             text: '❌ Only the bot owner can unblock users' 
         });
@@ -108,7 +95,7 @@ const unblockUser = async (sock, msg, args, context) => {
         
         await sock.updateBlockStatus(userToUnblock, 'unblock');
         
-        const phoneNum = userToUnblock.replace('@s.whatsapp.net', '');
+        const phoneNum = userToUnblock.replace(/@[^@]+$/, '');
         return await sock.sendMessage(context.from, { 
             text: `✅ User unblocked successfully\n📱 Number: +${phoneNum}` 
         });
