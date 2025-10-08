@@ -1,49 +1,61 @@
-const axios = require('axios')
+const axios = require('axios');
 
-const lyrics = async (m, client) => {
-    if (!m.args[0]) return m.reply('❌ Please provide a song name')
-
+const lyrics = async (sock, msg, args, context) => {
+    if (!args[0]) {
+        return await sock.sendMessage(context.from, { 
+            text: `❌ Please provide a song name\n\nExample: ${context.prefix}lyrics Shape of You` 
+        });
+    }
+    
     try {
-        m.reply('⏳ Searching for lyrics...')
-
-        // First search for song to get ID
-        const searchUrl = 'https://musicapi.x007.workers.dev/search'
+        await sock.sendMessage(context.from, { 
+            text: '⏳ Searching for lyrics...' 
+        });
+        
+        const searchUrl = 'https://musicapi.x007.workers.dev/search';
         const searchResponse = await axios.get(searchUrl, {
             params: {
-                q: m.args.join(' '),
+                q: args.join(' '),
                 searchEngine: 'gaama'
             }
-        })
-
+        });
+        
         if (!searchResponse.data.response?.length) {
-            return m.reply('❌ Song not found')
+            return await sock.sendMessage(context.from, { 
+                text: '❌ Song not found. Please check the spelling and try again.' 
+            });
         }
-
-        const song = searchResponse.data.response[0]
-
-        // Get lyrics using song ID
-        const lyricsUrl = 'https://musicapi.x007.workers.dev/lyrics'
+        
+        const song = searchResponse.data.response[0];
+        
+        const lyricsUrl = 'https://musicapi.x007.workers.dev/lyrics';
         const lyricsResponse = await axios.get(lyricsUrl, {
             params: { id: song.id }
-        })
-
+        });
+        
         if (!lyricsResponse.data.response) {
-            return m.reply('❌ Lyrics not found')
+            return await sock.sendMessage(context.from, { 
+                text: '❌ Lyrics not found for this song' 
+            });
         }
-
-        // Clean up lyrics from HTML tags
+        
         const cleanLyrics = lyricsResponse.data.response
             .replace(/<\/?p>/g, '')
-            .replace(/<br\/?>/g, '\n')
-
-        await m.reply(`📝 Lyrics for ${song.title}:\n\n${cleanLyrics}`)
+            .replace(/<br\/?>/g, '\n');
+        
+        await sock.sendMessage(context.from, { 
+            text: `📝 Lyrics for ${song.title}:\n\n${cleanLyrics}` 
+        });
+        
     } catch (error) {
-        console.error('Error in lyrics command:', error)
-        return m.reply('❌ Failed to fetch lyrics')
+        console.error('Error in lyrics command:', error.message);
+        return await sock.sendMessage(context.from, { 
+            text: '❌ Failed to fetch lyrics. Please try again later.' 
+        });
     }
-}
+};
 
 module.exports = {
     command: 'lyrics',
     handler: lyrics
-}
+};
