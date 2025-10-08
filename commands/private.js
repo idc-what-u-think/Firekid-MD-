@@ -8,11 +8,9 @@ const ensureDataDir = () => {
     try {
         if (!fs.existsSync(DATA_DIR)) {
             fs.mkdirSync(DATA_DIR, { recursive: true });
-            console.log('Created data directory at:', DATA_DIR);
         }
     } catch (error) {
         console.error('Error creating data directory:', error.message);
-        console.error('Attempted path:', DATA_DIR);
     }
 };
 
@@ -41,7 +39,6 @@ const savePrivateMode = (enabled) => {
         return true;
     } catch (error) {
         console.error('Error saving private mode:', error.message);
-        console.error('Attempted path:', CONFIG_FILE);
         return false;
     }
 };
