@@ -1,51 +1,116 @@
 const menu = async (sock, msg, args, context) => {
-    const user = msg.pushName || 'user';
-    const time = new Date().toLocaleTimeString();
-    const uptime = Math.floor(process.uptime());
-    const ping = Date.now() - (msg.messageTimestamp * 1000);
+    const user = msg.pushName || 'User';
+    const time = new Date().toLocaleTimeString('en-US', { 
+        hour: '2-digit', 
+        minute: '2-digit',
+        hour12: true 
+    });
+    const date = new Date().toLocaleDateString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+    });
     
-    const menuText = `----------------{Firekid XMD}---------------
-Hello ${user}
-Time: ${time}
-UPTIME: ${uptime}s
-PING: ${ping}ms
-Version: 1.0.0
+    const formatUptime = (seconds) => {
+        const days = Math.floor(seconds / 86400);
+        const hours = Math.floor((seconds % 86400) / 3600);
+        const minutes = Math.floor((seconds % 3600) / 60);
+        const secs = Math.floor(seconds % 60);
+        
+        let result = [];
+        if (days > 0) result.push(`${days}d`);
+        if (hours > 0) result.push(`${hours}h`);
+        if (minutes > 0) result.push(`${minutes}m`);
+        if (secs > 0 || result.length === 0) result.push(`${secs}s`);
+        
+        return result.join(' ');
+    };
+    
+    const uptime = formatUptime(process.uptime());
+    const ping = Math.abs(Date.now() - (msg.messageTimestamp * 1000));
+    
+    const menuText = `╭━━━『 *FIREKID XMD* 』━━━╮
+│
+│ 👤 *User:* ${user}
+│ 📅 *Date:* ${date}
+│ ⏰ *Time:* ${time}
+│ ⚡ *Uptime:* ${uptime}
+│ 📡 *Ping:* ${ping}ms
+│ 🔖 *Version:* 1.0.0
+│
+╰━━━━━━━━━━━━━━━━━━━━╯
 
-Available Commands:
-- menu: Shows this menu
-- ping: Check bot response time
-- warn: Warn users (admin)
-- alive: Check if bot is running
-- vv: Anti view once/status sender
-- delete: Delete messages (admin)
-- kick: Kick users from group (admin)
-- tagall: Tag all group members (admin)
-- promote: Promote user to admin (admin)
-- mute: Lock group chat (admin)
-- unmute: Unlock group chat (admin)
-- left: Left message notification (admin)
-- tag: Tag users without listing
-- join: Join message notification (admin)
-- resetwarning: Remove warning from a user
-- allowdomain: Allow specific domains in group (admin)
-- setgrppp: Set group picture (admin)
-- antilnk: Anti-link protection (admin)
-- sticker: Create sticker
-- toimg: Convert sticker to image
-- filter: Delete filtered words
-- country: Country guessing game
-- kill: Send wasted effect
-- online: Toggle auto-read
-- block: Block user
-- sudo: Sudo a new user to use the bot
-- unlock: Unblock user
-- ttdownload: Download TikTok video
-- song: Download songs
-- lyrics: Get song lyrics
-- weather: Get weather info
-- movie: Search movie details
+╭━━━『 *GENERAL* 』━━━╮
+│
+│ • menu - Show this menu
+│ • ping - Check response time
+│ • alive - Check bot status
+│ • online - Toggle auto-read
+│
+╰━━━━━━━━━━━━━━━━━━━━╯
 
-[Made By Firekid]`;
+╭━━━『 *ADMIN TOOLS* 』━━━╮
+│
+│ • warn - Warn users
+│ • resetwarning - Clear warnings
+│ • kick - Remove members
+│ • promote - Make admin
+│ • delete - Delete messages
+│ • tagall - Mention everyone
+│ • tag - Tag without list
+│ • mute - Lock group chat
+│ • unmute - Unlock group chat
+│ • setgrppp - Set group picture
+│
+╰━━━━━━━━━━━━━━━━━━━━╯
+
+╭━━━『 *GROUP SETTINGS* 』━━━╮
+│
+│ • antilnk - Anti-link system
+│ • allowdomain - Whitelist domains
+│ • left - Leave notifications
+│ • join - Join notifications
+│ • filter - Word filtering
+│
+╰━━━━━━━━━━━━━━━━━━━━╯
+
+╭━━━『 *MEDIA TOOLS* 』━━━╮
+│
+│ • vv - Reveal view once
+│ • sticker - Create sticker
+│ • toimg - Sticker to image
+│
+╰━━━━━━━━━━━━━━━━━━━━╯
+
+╭━━━『 *DOWNLOADER* 』━━━╮
+│
+│ • ttdownload - TikTok videos
+│ • song - Download songs
+│ • movie - Movie details
+│
+╰━━━━━━━━━━━━━━━━━━━━╯
+
+╭━━━『 *FUN & GAMES* 』━━━╮
+│
+│ • country - Guess the country
+│ • kill - Wasted effect
+│ • lyrics - Get song lyrics
+│ • weather - Weather info
+│
+╰━━━━━━━━━━━━━━━━━━━━╯
+
+╭━━━『 *OWNER ONLY* 』━━━╮
+│
+│ • sudo - Manage sudo users
+│ • block - Block users
+│ • unlock - Unblock users
+│
+╰━━━━━━━━━━━━━━━━━━━━╯
+
+┏━━━━━━━━━━━━━━━━━━━┓
+┃ *Made with 🔥 by Firekid*
+┗━━━━━━━━━━━━━━━━━━━┛`;
 
     return await sock.sendMessage(context.from, { text: menuText });
 };
