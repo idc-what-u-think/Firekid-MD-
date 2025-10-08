@@ -1,3 +1,5 @@
+const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
+
 const vv = async (sock, msg, args, context) => {
     try {
         const quotedMsg = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
@@ -5,121 +7,114 @@ const vv = async (sock, msg, args, context) => {
         if (!quotedMsg) {
             return await sock.sendMessage(context.from, {
                 text: '❌ Reply to a view once message'
-            });
+            }, { quoted: msg });
         }
 
         let viewOnceMsg = null;
-        let messageType = null;
+        let mediaType = null;
 
-        if (quotedMsg.viewOnceMessage) {
+        if (quotedMsg.imageMessage?.viewOnce) {
+            viewOnceMsg = quotedMsg.imageMessage;
+            mediaType = 'image';
+        } else if (quotedMsg.videoMessage?.viewOnce) {
+            viewOnceMsg = quotedMsg.videoMessage;
+            mediaType = 'video';
+        } else if (quotedMsg.viewOnceMessage) {
             viewOnceMsg = quotedMsg.viewOnceMessage.message;
-            messageType = 'viewOnceMessage';
+            if (viewOnceMsg.imageMessage) {
+                mediaType = 'image';
+                viewOnceMsg = viewOnceMsg.imageMessage;
+            } else if (viewOnceMsg.videoMessage) {
+                mediaType = 'video';
+                viewOnceMsg = viewOnceMsg.videoMessage;
+            }
         } else if (quotedMsg.viewOnceMessageV2) {
             viewOnceMsg = quotedMsg.viewOnceMessageV2.message;
-            messageType = 'viewOnceMessageV2';
+            if (viewOnceMsg.imageMessage) {
+                mediaType = 'image';
+                viewOnceMsg = viewOnceMsg.imageMessage;
+            } else if (viewOnceMsg.videoMessage) {
+                mediaType = 'video';
+                viewOnceMsg = viewOnceMsg.videoMessage;
+            }
         } else if (quotedMsg.viewOnceMessageV2Extension) {
             viewOnceMsg = quotedMsg.viewOnceMessageV2Extension.message;
-            messageType = 'viewOnceMessageV2Extension';
+            if (viewOnceMsg.imageMessage) {
+                mediaType = 'image';
+                viewOnceMsg = viewOnceMsg.imageMessage;
+            } else if (viewOnceMsg.videoMessage) {
+                mediaType = 'video';
+                viewOnceMsg = viewOnceMsg.videoMessage;
+            }
         } else {
             return await sock.sendMessage(context.from, {
-                text: '❌ This is not a view once message\n\nSupported types:\n• View once photos\n• View once videos\n• View once documents'
-            });
+                text: '❌ This is not a view once message\n\nSupported types:\n• View once photos\n• View once videos'
+            }, { quoted: msg });
         }
 
-        if (!viewOnceMsg) {
+        if (!viewOnceMsg || !mediaType) {
             return await sock.sendMessage(context.from, {
                 text: '❌ Could not extract view once content'
-            });
+            }, { quoted: msg });
         }
 
         let buffer;
         try {
-            buffer = await sock.downloadMediaMessage(msg.message.extendedTextMessage.contextInfo.quotedMessage);
+            const stream = await downloadContentFromMessage(viewOnceMsg, mediaType);
+            buffer = Buffer.from([]);
+            for await (const chunk of stream) {
+                buffer = Buffer.concat([buffer, chunk]);
+            }
         } catch (downloadError) {
             console.error('Download error:', downloadError);
             
-            if (downloadError.message?.includes('Bad MAC')) {
+            if (downloadError.message?.includes('Bad MAC') || downloadError.message?.includes('decrypt')) {
                 return await sock.sendMessage(context.from, {
                     text: '❌ Cannot download this view once message\n\n*Possible reasons:*\n• Message already viewed\n• Message expired\n• Session encryption error\n\n💡 Ask sender to send it again'
-                });
+                }, { quoted: msg });
             }
             
             return await sock.sendMessage(context.from, {
                 text: '❌ Failed to download media. The message might be expired.'
-            });
+            }, { quoted: msg });
         }
 
         if (!buffer || buffer.length === 0) {
             return await sock.sendMessage(context.from, {
                 text: '❌ Downloaded empty file. Message might be corrupted or expired.'
-            });
+            }, { quoted: msg });
         }
 
-        if (viewOnceMsg.imageMessage) {
-            const caption = viewOnceMsg.imageMessage.caption || '📸 View once image revealed';
+        if (mediaType === 'image') {
+            const caption = viewOnceMsg.caption || '📸 View once image revealed';
             
             await sock.sendMessage(context.from, { 
                 image: buffer,
-                caption: caption 
+                caption: caption,
+                fileName: 'viewonce.jpg'
             }, { quoted: msg });
             
-        } else if (viewOnceMsg.videoMessage) {
-            const caption = viewOnceMsg.videoMessage.caption || '🎥 View once video revealed';
+        } else if (mediaType === 'video') {
+            const caption = viewOnceMsg.caption || '🎥 View once video revealed';
             
             await sock.sendMessage(context.from, { 
                 video: buffer,
                 caption: caption,
-                mimetype: viewOnceMsg.videoMessage.mimetype || 'video/mp4'
+                fileName: 'viewonce.mp4',
+                mimetype: viewOnceMsg.mimetype || 'video/mp4'
             }, { quoted: msg });
-            
-        } else if (viewOnceMsg.audioMessage) {
-            await sock.sendMessage(context.from, { 
-                audio: buffer,
-                mimetype: viewOnceMsg.audioMessage.mimetype || 'audio/mp4',
-                ptt: viewOnceMsg.audioMessage.ptt || false
-            }, { quoted: msg });
-            
-        } else if (viewOnceMsg.documentMessage) {
-            const fileName = viewOnceMsg.documentMessage.fileName || 'view_once_document';
-            
-            await sock.sendMessage(context.from, { 
-                document: buffer,
-                mimetype: viewOnceMsg.documentMessage.mimetype || 'application/octet-stream',
-                fileName: fileName,
-                caption: '📄 View once document revealed'
-            }, { quoted: msg });
-            
-        } else if (viewOnceMsg.stickerMessage) {
-            await sock.sendMessage(context.from, { 
-                sticker: buffer
-            }, { quoted: msg });
-            
-        } else {
-            try {
-                await sock.sendMessage(context.from, { 
-                    image: buffer,
-                    caption: '📱 View once media revealed'
-                }, { quoted: msg });
-            } catch {
-                await sock.sendMessage(context.from, { 
-                    document: buffer,
-                    fileName: 'view_once_media',
-                    mimetype: 'application/octet-stream',
-                    caption: '📱 View once media revealed'
-                }, { quoted: msg });
-            }
         }
         
         return await sock.sendMessage(context.from, {
             text: '✅ View once media revealed successfully!'
-        });
+        }, { quoted: msg });
         
     } catch (error) {
         console.error('VV Command Error:', error);
         
         return await sock.sendMessage(context.from, {
             text: `❌ Error: ${error.message || 'Failed to process view once message'}`
-        });
+        }, { quoted: msg });
     }
 };
 
