@@ -73,10 +73,18 @@
       "created": "2025-10-08T11:33:38.237Z",
       "status": "active",
       "fileCount": 31
+    },
+    "06AB1BD050C84968": {
+      "sessionId": "06AB1BD050C84968",
+      "phoneNumber": "234****0975",
+      "userId": 1783869578,
+      "created": "2025-10-08T13:20:07.361Z",
+      "status": "active",
+      "fileCount": 31
     }
   },
   "stats": {
-    "totalSessions": 9,
-    "lastUpdated": "2025-10-08T11:33:38.238Z"
+    "totalSessions": 10,
+    "lastUpdated": "2025-10-08T13:20:07.362Z"
   }
 }
