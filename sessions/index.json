@@ -65,10 +65,18 @@
       "created": "2025-09-20T12:39:24.607Z",
       "status": "active",
       "fileCount": 31
+    },
+    "89EE03A7807CA35B": {
+      "sessionId": "89EE03A7807CA35B",
+      "phoneNumber": "234****0975",
+      "userId": 1783869578,
+      "created": "2025-10-08T11:33:38.237Z",
+      "status": "active",
+      "fileCount": 31
     }
   },
   "stats": {
-    "totalSessions": 8,
-    "lastUpdated": "2025-09-20T12:39:24.608Z"
+    "totalSessions": 9,
+    "lastUpdated": "2025-10-08T11:33:38.238Z"
   }
 }
