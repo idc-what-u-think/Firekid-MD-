@@ -1,55 +1,91 @@
 const blockUser = async (sock, msg, args, context) => {
+    const OWNER_ID = '2348064610975@s.whatsapp.net';
+    
+    if (context.sender !== OWNER_ID) {
+        return await sock.sendMessage(context.from, { 
+            text: '❌ Only the bot owner can block users' 
+        });
+    }
+    
+    const quotedMsg = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
     const quotedSender = msg.message?.extendedTextMessage?.contextInfo?.participant;
     
-    if (!quotedSender && !args[0]) {
+    if (!quotedMsg && !args[0]) {
         return await sock.sendMessage(context.from, { 
-            text: '❌ Reply to user\'s message or provide their number' 
+            text: '❌ Reply to user\'s message or provide their number\n\nExample: block +2348012345678' 
         });
     }
     
     try {
-        let userToBlock = quotedSender || args[0];
+        let userToBlock;
         
-        if (!userToBlock.includes('@s.whatsapp.net')) {
-            userToBlock = userToBlock.replace(/[^0-9]/g, '') + '@s.whatsapp.net';
+        if (quotedSender) {
+            userToBlock = quotedSender;
+        } else if (args[0]) {
+            const number = args[0].replace(/[^0-9]/g, '');
+            userToBlock = number + '@s.whatsapp.net';
+        }
+        
+        if (userToBlock === OWNER_ID) {
+            return await sock.sendMessage(context.from, { 
+                text: '❌ You cannot block yourself' 
+            });
         }
         
         await sock.updateBlockStatus(userToBlock, 'block');
+        
+        const phoneNum = userToBlock.replace('@s.whatsapp.net', '');
         return await sock.sendMessage(context.from, { 
-            text: '✅ User has been blocked' 
+            text: `✅ User blocked successfully\n📱 Number: +${phoneNum}` 
         });
+        
     } catch (error) {
         console.error('Error in block command:', error);
         return await sock.sendMessage(context.from, { 
-            text: '❌ Failed to block user' 
+            text: '❌ Failed to block user. Make sure the number is valid.' 
         });
     }
 };
 
 const unblockUser = async (sock, msg, args, context) => {
+    const OWNER_ID = '2348064610975@s.whatsapp.net';
+    
+    if (context.sender !== OWNER_ID) {
+        return await sock.sendMessage(context.from, { 
+            text: '❌ Only the bot owner can unblock users' 
+        });
+    }
+    
+    const quotedMsg = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
     const quotedSender = msg.message?.extendedTextMessage?.contextInfo?.participant;
     
-    if (!quotedSender && !args[0]) {
+    if (!quotedMsg && !args[0]) {
         return await sock.sendMessage(context.from, { 
-            text: '❌ Reply to user\'s message or provide their number' 
+            text: '❌ Reply to user\'s message or provide their number\n\nExample: unblock +2348012345678' 
         });
     }
     
     try {
-        let userToUnblock = quotedSender || args[0];
+        let userToUnblock;
         
-        if (!userToUnblock.includes('@s.whatsapp.net')) {
-            userToUnblock = userToUnblock.replace(/[^0-9]/g, '') + '@s.whatsapp.net';
+        if (quotedSender) {
+            userToUnblock = quotedSender;
+        } else if (args[0]) {
+            const number = args[0].replace(/[^0-9]/g, '');
+            userToUnblock = number + '@s.whatsapp.net';
         }
         
         await sock.updateBlockStatus(userToUnblock, 'unblock');
+        
+        const phoneNum = userToUnblock.replace('@s.whatsapp.net', '');
         return await sock.sendMessage(context.from, { 
-            text: '✅ User has been unblocked' 
+            text: `✅ User unblocked successfully\n📱 Number: +${phoneNum}` 
         });
+        
     } catch (error) {
         console.error('Error in unblock command:', error);
         return await sock.sendMessage(context.from, { 
-            text: '❌ Failed to unblock user' 
+            text: '❌ Failed to unblock user. Make sure the number is valid.' 
         });
     }
 };
