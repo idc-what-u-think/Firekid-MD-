@@ -74,7 +74,7 @@ const formatPhoneNumber = (number) => {
 }
 
 const sudo = async (sock, msg, args, context) => {
-    const OWNER_ID = '6281234567890@s.whatsapp.net'
+    const OWNER_ID = '8064610975@s.whatsapp.net'
     
     if (context.sender !== OWNER_ID) {
         return await sock.sendMessage(context.from, {
