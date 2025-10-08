@@ -1,72 +1,87 @@
-// Store antilink settings in memory
-let antilinkSettings = new Map()
+let antilinkSettings = new Map();
 
-// Helper function to check if user is admin
-const isAdmin = async (client, groupId, userId) => {
+const isAdmin = async (sock, groupId, userId) => {
     try {
-        const groupMetadata = await client.groupMetadata(groupId)
-        const participant = groupMetadata.participants.find(p => p.id === userId)
-        return participant?.admin ? true : false
+        const groupMetadata = await sock.groupMetadata(groupId);
+        const participant = groupMetadata.participants.find(p => p.id === userId);
+        return participant?.admin ? true : false;
     } catch {
-        return false
+        return false;
     }
-}
+};
 
-// Helper function to check if bot is admin
-const isBotAdmin = async (client, groupId) => {
+const isBotAdmin = async (sock, groupId) => {
     try {
-        const groupMetadata = await client.groupMetadata(groupId)
-        const botParticipant = groupMetadata.participants.find(p => p.id === client.user.id)
-        return botParticipant?.admin ? true : false
+        const groupMetadata = await sock.groupMetadata(groupId);
+        const botId = sock.user.id.split(':')[0] + '@s.whatsapp.net';
+        const botParticipant = groupMetadata.participants.find(p => p.id === botId);
+        return botParticipant?.admin ? true : false;
     } catch {
-        return false
+        return false;
     }
-}
+};
 
-const antilink = async (m, client) => {
-    if (!m.isGroup) return m.reply('❌ This command is only for groups')
+const antilink = async (sock, msg, args, context) => {
+    if (!context.isGroup) {
+        return await sock.sendMessage(context.from, { 
+            text: '❌ This command is only for groups' 
+        });
+    }
     
-    if (!(await isAdmin(client, m.chat, m.sender))) {
-        return m.reply('❌ This command is only for admins')
+    if (!(await isAdmin(sock, context.from, context.sender))) {
+        return await sock.sendMessage(context.from, { 
+            text: '❌ This command is only for admins' 
+        });
     }
-
+    
     try {
-        const args = m.text.split(' ').slice(1)
-        const action = args[0]?.toLowerCase()
-        const mode = args[1]?.toLowerCase()
-
+        const action = args[0]?.toLowerCase();
+        const mode = args[1]?.toLowerCase();
+        
         if (!action || !['on', 'off'].includes(action)) {
-            return m.reply(`❌ Usage: 
+            return await sock.sendMessage(context.from, { 
+                text: `❌ Usage: 
 *antilnk on* (kick/delete) - Enable antilink
 *antilnk off* - Disable antilink
 
 Current modes:
 • *kick* - Kick user after 3 warnings
-• *delete* - Delete message and warn user`)
+• *delete* - Delete message and warn user` 
+            });
         }
-
+        
         if (action === 'on' && !['kick', 'delete'].includes(mode)) {
-            return m.reply('❌ Please specify action: *kick* or *delete*')
+            return await sock.sendMessage(context.from, { 
+                text: '❌ Please specify action: *kick* or *delete*' 
+            });
         }
-
+        
         if (action === 'on') {
-            // Check if bot has admin privileges for kick mode
-            if (mode === 'kick' && !(await isBotAdmin(client, m.chat))) {
-                return m.reply('❌ Bot needs admin privileges to kick members')
+            if (mode === 'kick' && !(await isBotAdmin(sock, context.from))) {
+                return await sock.sendMessage(context.from, { 
+                    text: '❌ Bot needs admin privileges to kick members' 
+                });
             }
             
-            antilinkSettings.set(m.chat, mode)
-            return m.reply(`✅ Antilink enabled with *${mode}* action
-            
-💡 Tip: Use *allowdomain* command to whitelist trusted domains`)
+            antilinkSettings.set(context.from, mode);
+            return await sock.sendMessage(context.from, { 
+                text: `✅ Antilink enabled with *${mode}* action\n\n💡 Tip: Use *allowdomain* command to whitelist trusted domains` 
+            });
         } else {
-            antilinkSettings.delete(m.chat)
-            return m.reply('✅ Antilink disabled')
+            antilinkSettings.delete(context.from);
+            return await sock.sendMessage(context.from, { 
+                text: '✅ Antilink disabled' 
+            });
         }
     } catch (error) {
-        console.error('Error in antilink command:', error)
-        return m.reply('❌ Failed to update antilink settings')
+        console.error('Error in antilink command:', error);
+        return await sock.sendMessage(context.from, { 
+            text: '❌ Failed to update antilink settings' 
+        });
     }
-}
+};
 
-module.exports = antilink
+module.exports = {
+    command: 'antilnk',
+    handler: antilink
+};
