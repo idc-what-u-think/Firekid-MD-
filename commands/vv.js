@@ -35,6 +35,13 @@ const vv = async (sock, msg, args, context) => {
                 buffer = await sock.downloadMediaMessage(messageToDownload);
             } catch (e) {
                 console.error('Download error:', e);
+                
+                if (e.message?.includes('Bad MAC')) {
+                    return await sock.sendMessage(context.from, {
+                        text: '❌ Cannot download this view-once message\n\n*Possible reasons:*\n• Message already viewed/expired\n• Session encryption mismatch\n• Message too old\n\n💡 *Tip:* Ask sender to send it again'
+                    });
+                }
+                
                 return await sock.sendMessage(context.from, {
                     text: '❌ Failed to download media. The message might be expired or already viewed.'
                 });
