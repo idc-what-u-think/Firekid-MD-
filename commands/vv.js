@@ -34,18 +34,7 @@ const vv = async (sock, msg, args, context) => {
 
         let buffer;
         try {
-            const quotedKey = msg.message.extendedTextMessage.contextInfo;
-            
-            const downloadMessage = {
-                key: {
-                    remoteJid: quotedKey.participant || context.from,
-                    id: quotedKey.stanzaId,
-                    fromMe: false
-                },
-                message: quotedMsg
-            };
-
-            buffer = await sock.downloadMediaMessage(downloadMessage);
+            buffer = await sock.downloadMediaMessage(msg.message.extendedTextMessage.contextInfo.quotedMessage);
         } catch (downloadError) {
             console.error('Download error:', downloadError);
             
