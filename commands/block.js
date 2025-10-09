@@ -33,7 +33,7 @@ const blockUser = async (sock, msg, args, context) => {
                 userToBlock = userToBlock + '@s.whatsapp.net';
             }
         } else if (args[0]) {
-            let number = args[0].replace(/[^0-9]/g, '');
+            const number = args[0].replace(/[^0-9]/g, '');
             userToBlock = number + '@s.whatsapp.net';
         }
         
@@ -83,7 +83,7 @@ const unblockUser = async (sock, msg, args, context) => {
                 userToUnblock = userToUnblock + '@s.whatsapp.net';
             }
         } else if (args[0]) {
-            let number = args[0].replace(/[^0-9]/g, '');
+            const number = args[0].replace(/[^0-9]/g, '');
             userToUnblock = number + '@s.whatsapp.net';
         }
         
