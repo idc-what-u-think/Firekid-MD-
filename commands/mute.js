@@ -2,10 +2,16 @@ const isOwner = (sender) => {
     const ownerNumber = process.env.OWNER_NUMBER;
     if (!ownerNumber) return false;
     
-    const senderNumber = sender.split('@')[0].split(':')[0];
+    const senderNumber = sender.replace(/[^0-9]/g, '');
     const ownerNum = ownerNumber.replace(/[^0-9]/g, '');
     
+    console.log(`Owner check - Sender: ${senderNumber}, Owner: ${ownerNum}, Match: ${senderNumber === ownerNum}`);
+    
     return senderNumber === ownerNum;
+};
+
+const extractNumber = (jid) => {
+    return jid.replace(/[^0-9]/g, '');
 };
 
 const mute = async (sock, msg, args, context) => {
@@ -18,23 +24,20 @@ const mute = async (sock, msg, args, context) => {
     try {
         const groupMetadata = await sock.groupMetadata(context.from);
         
-        const senderNumber = context.sender.split('@')[0].split(':')[0];
+        const senderNumber = extractNumber(context.sender);
         const senderParticipant = groupMetadata.participants.find(p => {
-            const pNum = p.id.split('@')[0].split(':')[0];
-            return pNum === senderNumber;
+            return extractNumber(p.id) === senderNumber;
         });
         const isSenderAdmin = senderParticipant && (senderParticipant.admin === 'admin' || senderParticipant.admin === 'superadmin');
         
-        const botJid = sock.user.id;
-        const botNumber = botJid.split(':')[0].split('@')[0];
+        const botNumber = extractNumber(sock.user.id);
         const botParticipant = groupMetadata.participants.find(p => {
-            const pNum = p.id.split('@')[0].split(':')[0];
-            return pNum === botNumber;
+            return extractNumber(p.id) === botNumber;
         });
         const isBotAdmin = botParticipant && (botParticipant.admin === 'admin' || botParticipant.admin === 'superadmin');
         
-        console.log(`Debug - Bot JID: ${botJid}, Bot Number: ${botNumber}, Is Bot Admin: ${isBotAdmin}`);
-        console.log(`Debug - Sender: ${context.sender}, Sender Number: ${senderNumber}, Is Sender Admin: ${isSenderAdmin}`);
+        console.log(`Debug - Bot Number: ${botNumber}, Is Bot Admin: ${isBotAdmin}`);
+        console.log(`Debug - Sender Number: ${senderNumber}, Is Sender Admin: ${isSenderAdmin}`);
         
         if (!isBotAdmin) {
             return await sock.sendMessage(context.from, { 
