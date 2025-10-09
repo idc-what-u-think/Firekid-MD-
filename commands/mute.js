@@ -12,7 +12,7 @@ const mute = async (sock, msg, args, context) => {
     if (!context.isGroup) {
         return await sock.sendMessage(context.from, { 
             text: '❌ This command is only for groups' 
-        });
+        }, { quoted: msg });
     }
     
     try {
@@ -25,23 +25,27 @@ const mute = async (sock, msg, args, context) => {
         });
         const isSenderAdmin = senderParticipant && (senderParticipant.admin === 'admin' || senderParticipant.admin === 'superadmin');
         
-        const botNumber = sock.user.id.split(':')[0];
+        const botJid = sock.user.id;
+        const botNumber = botJid.split(':')[0].split('@')[0];
         const botParticipant = groupMetadata.participants.find(p => {
             const pNum = p.id.split('@')[0].split(':')[0];
             return pNum === botNumber;
         });
         const isBotAdmin = botParticipant && (botParticipant.admin === 'admin' || botParticipant.admin === 'superadmin');
         
+        console.log(`Debug - Bot JID: ${botJid}, Bot Number: ${botNumber}, Is Bot Admin: ${isBotAdmin}`);
+        console.log(`Debug - Sender: ${context.sender}, Sender Number: ${senderNumber}, Is Sender Admin: ${isSenderAdmin}`);
+        
         if (!isBotAdmin) {
             return await sock.sendMessage(context.from, { 
                 text: '❌ Bot must be admin to mute group' 
-            });
+            }, { quoted: msg });
         }
 
         if (!isSenderAdmin && !isOwner(context.sender)) {
             return await sock.sendMessage(context.from, { 
                 text: '❌ This command is only for admins' 
-            });
+            }, { quoted: msg });
         }
         
         const durationInMinutes = args[0] ? parseInt(args[0]) : undefined;
@@ -56,7 +60,7 @@ const mute = async (sock, msg, args, context) => {
             await sock.sendMessage(context.from, {
                 text: muteMsg,
                 mentions: [context.sender]
-            });
+            }, { quoted: msg });
             
             setTimeout(async () => {
                 try {
@@ -75,14 +79,14 @@ const mute = async (sock, msg, args, context) => {
             await sock.sendMessage(context.from, {
                 text: muteMsg,
                 mentions: [context.sender]
-            });
+            }, { quoted: msg });
         }
         
     } catch (error) {
         console.error('Error in mute command:', error.message);
         return await sock.sendMessage(context.from, { 
             text: `❌ Failed to mute group: ${error.message}` 
-        });
+        }, { quoted: msg });
     }
 };
 
