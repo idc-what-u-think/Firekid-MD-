@@ -1,7 +1,5 @@
-// Country game for WhatsApp bot
 const activeGames = new Map();
 
-// Countries by continent
 const continents = {
     'Africa': [
         'Nigeria', 'Kenya', 'Egypt', 'South Africa', 'Morocco', 'Ghana', 'Ethiopia', 
@@ -27,21 +25,26 @@ const continents = {
         'Brazil', 'Argentina', 'Chile', 'Peru', 'Colombia', 'Venezuela', 'Ecuador', 
         'Bolivia', 'Paraguay', 'Uruguay', 'Guyana', 'Suriname', 'French Guiana'
     ],
-    'Australia': [
-        'Australia'
+    'Oceania': [
+        'Australia', 'New Zealand', 'Fiji', 'Papua New Guinea', 'Samoa', 'Tonga'
     ]
 };
 
-const countryGame = async (m, client) => {
-    if (!m.isGroup) return m.reply('❌ This game can only be played in groups');
-
-    const chatId = m.chat;
-    
-    if (activeGames.has(chatId)) {
-        return m.reply('🎮 A game is already active in this group!');
+const countryGame = async (sock, msg, args, context) => {
+    if (!context.isGroup) {
+        return await sock.sendMessage(context.from, { 
+            text: '❌ This game can only be played in groups' 
+        }, { quoted: msg });
     }
 
-    // Initialize game
+    const chatId = context.from;
+    
+    if (activeGames.has(chatId)) {
+        return await sock.sendMessage(context.from, { 
+            text: '🎮 A game is already active in this group!' 
+        }, { quoted: msg });
+    }
+
     const game = {
         players: [],
         phase: 'joining',
@@ -55,83 +58,116 @@ const countryGame = async (m, client) => {
 
     activeGames.set(chatId, game);
 
-    await m.reply('🌍 Get ready to play Country game\nType *Join* to enter');
+    await sock.sendMessage(context.from, { 
+        text: '🌍 *Country Game Started!*\n\nType *join* to enter the game\n⏰ You have 60 seconds to join' 
+    }, { quoted: msg });
 
-    // Start 60-second joining countdown
     let timeLeft = 60;
     
     const countdown = setInterval(async () => {
         timeLeft -= 15;
         
         if (timeLeft === 45) {
-            await m.reply('⏰ 45 seconds left, get ready');
+            await sock.sendMessage(context.from, { 
+                text: '⏰ 45 seconds left to join' 
+            });
         } else if (timeLeft === 30) {
-            await m.reply('⏰ 30 seconds left, get ready');
+            await sock.sendMessage(context.from, { 
+                text: '⏰ 30 seconds left to join' 
+            });
         } else if (timeLeft === 15) {
-            await m.reply('⏰ 15 seconds left, get ready');
+            await sock.sendMessage(context.from, { 
+                text: '⏰ 15 seconds left to join' 
+            });
         } else if (timeLeft <= 0) {
             clearInterval(countdown);
-            await startGame(m, client, chatId);
+            await startGame(sock, context.from);
         }
     }, 15000);
 
-    // Final countdown 5,4,3,2,1
+    game.countdownTimer = countdown;
+
     setTimeout(async () => {
         for (let i = 5; i >= 1; i--) {
             await new Promise(resolve => setTimeout(resolve, 1000));
-            await m.reply(i.toString());
+            await sock.sendMessage(context.from, { text: i.toString() });
         }
     }, 55000);
 };
 
-const joinGame = async (m, client) => {
-    const chatId = m.chat;
+const joinGame = async (sock, msg, context) => {
+    const chatId = context.from;
     const game = activeGames.get(chatId);
     
     if (!game || game.phase !== 'joining') return;
     
-    const userId = m.sender;
+    const userId = context.sender;
     if (game.players.some(p => p.id === userId)) {
-        return; // Already joined
+        return;
     }
+    
+    const playerName = msg.pushName || 'Player';
+    const senderNumber = context.sender.split('@')[0];
     
     game.players.push({
         id: userId,
-        name: m.pushName || 'Player',
-        mention: `@${userId.split('@')[0]}`
+        name: playerName,
+        mention: `@${senderNumber}`
     });
     
-    await m.reply(`✅ ${game.players[game.players.length - 1].mention} Joined`);
+    await sock.sendMessage(context.from, { 
+        text: `✅ @${senderNumber} joined the game!\n👥 Total players: ${game.players.length}`,
+        mentions: [userId]
+    });
 };
 
-const startGame = async (m, client, chatId) => {
+const startGame = async (sock, chatId) => {
     const game = activeGames.get(chatId);
     
     if (!game || game.players.length < 2) {
+        if (game && game.countdownTimer) {
+            clearInterval(game.countdownTimer);
+        }
         activeGames.delete(chatId);
-        return m.reply('❌ Need at least 2 players to start the game');
+        return await sock.sendMessage(chatId, { 
+            text: '❌ Need at least 2 players to start the game' 
+        });
+    }
+    
+    if (game.countdownTimer) {
+        clearInterval(game.countdownTimer);
     }
     
     game.phase = 'playing';
-    await nextTurn(m, client, chatId);
+    
+    const playerList = game.players.map((p, i) => `${i + 1}. ${p.mention}`).join('\n');
+    await sock.sendMessage(chatId, { 
+        text: `🎮 *Game Starting!*\n\n👥 *Players:*\n${playerList}\n\nGet ready!`,
+        mentions: game.players.map(p => p.id)
+    });
+    
+    setTimeout(() => nextTurn(sock, chatId), 2000);
 };
 
-const nextTurn = async (m, client, chatId) => {
+const nextTurn = async (sock, chatId) => {
     const game = activeGames.get(chatId);
     if (!game) return;
     
     if (game.players.length <= 1) {
-        // Game over - announce winner
         if (game.players.length === 1) {
-            await m.reply(`🏆 ${game.players[0].mention} won, GGs, bro is him`);
+            await sock.sendMessage(chatId, { 
+                text: `🏆 *${game.players[0].mention} WON!*\n\nGGs, bro is him 🔥`,
+                mentions: [game.players[0].id]
+            });
         } else {
-            await m.reply('🎮 Game ended - no players left');
+            await sock.sendMessage(chatId, { 
+                text: '🎮 Game ended - no players left' 
+            });
         }
         activeGames.delete(chatId);
         return;
     }
     
-    // Pick random continent
     const continentNames = Object.keys(continents);
     game.continent = continentNames[Math.floor(Math.random() * continentNames.length)];
     
@@ -139,84 +175,81 @@ const nextTurn = async (m, client, chatId) => {
     const nextPlayerIndex = (game.currentPlayer + 1) % game.players.length;
     const nextPlayer = game.players[nextPlayerIndex];
     
-    // Determine timer based on round
-    let timeLimit = 25; // Default
+    let timeLimit = 25;
     if (game.round >= 3) timeLimit = 20;
     if (game.round >= 5) timeLimit = 15;
     if (game.round >= 7) timeLimit = 10;
     
-    await m.reply(`🎯 Turn: ${currentPlayer.mention} mention a country in ${game.continent}\n⏭️ Next: ${nextPlayer.mention} get ready, you are next`);
+    await sock.sendMessage(chatId, { 
+        text: `🎯 *Round ${game.round}*\n\n${currentPlayer.mention} mention a country in *${game.continent}*\n⏰ Time: ${timeLimit}s\n⏭️ Next: ${nextPlayer.mention}`,
+        mentions: [currentPlayer.id, nextPlayer.id]
+    });
     
-    // Set timer for current player
     game.timer = setTimeout(async () => {
-        await m.reply(`⏰ ${currentPlayer.mention} ran out of time, better luck next time gng`);
+        await sock.sendMessage(chatId, { 
+            text: `⏰ ${currentPlayer.mention} ran out of time!\n\nBetter luck next time 👋`,
+            mentions: [currentPlayer.id]
+        });
         
-        // Remove player
         game.players.splice(game.currentPlayer, 1);
         
-        // Adjust current player index
         if (game.currentPlayer >= game.players.length) {
             game.currentPlayer = 0;
         }
         
-        // Continue to next turn
-        setTimeout(() => nextTurn(m, client, chatId), 1000);
+        setTimeout(() => nextTurn(sock, chatId), 1000);
     }, timeLimit * 1000);
 };
 
-const checkAnswer = async (m, client) => {
-    if (!m.isGroup) return;
+const checkAnswer = async (sock, msg, context) => {
+    if (!context.isGroup) return;
     
-    const chatId = m.chat;
+    const chatId = context.from;
     const game = activeGames.get(chatId);
     
-    // Check for join command
-    if (m.text.toLowerCase() === 'join') {
-        return joinGame(m, client);
+    const messageText = msg.message?.conversation || 
+                       msg.message?.extendedTextMessage?.text || '';
+    
+    if (messageText.toLowerCase() === 'join') {
+        return joinGame(sock, msg, context);
     }
     
     if (!game || game.phase !== 'playing') return;
     
     const currentPlayer = game.players[game.currentPlayer];
-    if (m.sender !== currentPlayer.id) return;
+    if (context.sender !== currentPlayer.id) return;
     
-    const userAnswer = m.text.trim();
+    const userAnswer = messageText.trim();
     const validCountries = continents[game.continent];
     
-    // Check if answer is a valid country in the continent
     const isValidCountry = validCountries.some(country => 
         country.toLowerCase() === userAnswer.toLowerCase()
     );
     
-    if (!isValidCountry) return; // Bot ignores wrong continent answers
+    if (!isValidCountry) return;
     
-    // Check if country was already used
     if (game.usedCountries.includes(userAnswer.toLowerCase())) {
-        return; // Ignore already used countries
+        return;
     }
     
-    // Valid answer!
     game.usedCountries.push(userAnswer.toLowerCase());
     
-    // Clear current timer
     if (game.timer) {
         clearTimeout(game.timer);
         game.timer = null;
     }
     
-    // React with checkmark
-    await client.sendMessage(chatId, { react: { text: '✅', key: m.key } });
+    await sock.sendMessage(chatId, { 
+        react: { text: '✅', key: msg.key } 
+    });
     
-    // Move to next player
     game.currentPlayer = (game.currentPlayer + 1) % game.players.length;
     
-    // If we've gone through all players once, increment round
     if (game.currentPlayer === 0) {
         game.round++;
     }
     
-    // Continue to next turn after a short delay
-    setTimeout(() => nextTurn(m, client, chatId), 1500);
+    setTimeout(() => nextTurn(sock, chatId), 1500);
 };
 
 module.exports = {
