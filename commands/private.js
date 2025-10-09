@@ -45,10 +45,15 @@ const savePrivateMode = (enabled) => {
 
 const isOwner = (sender) => {
     const ownerNumber = process.env.OWNER_NUMBER;
-    if (!ownerNumber) return false;
+    if (!ownerNumber) {
+        console.log('Owner check failed: OWNER_NUMBER not set in environment');
+        return false;
+    }
     
-    const senderNumber = sender.split('@')[0].split(':')[0];
+    const senderNumber = sender.replace(/[^0-9]/g, '');
     const ownerNum = ownerNumber.replace(/[^0-9]/g, '');
+    
+    console.log(`Owner check - Sender: ${senderNumber}, Owner: ${ownerNum}, Match: ${senderNumber === ownerNum}`);
     
     return senderNumber === ownerNum;
 };
