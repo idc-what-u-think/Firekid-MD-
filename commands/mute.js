@@ -28,6 +28,17 @@ const isOwner = (sender) => {
     return senderNum === ownerNum;
 };
 
+const participantMatches = (participantId, targetJid) => {
+    const participantNum = normalizeNumber(participantId);
+    const targetNum = normalizeNumber(targetJid);
+    
+    if (participantId.includes('@lid')) {
+        return participantId === targetJid;
+    }
+    
+    return participantNum === targetNum;
+};
+
 const mute = async (sock, msg, args, context) => {
     if (!context.isGroup) {
         return await sock.sendMessage(context.from, { 
@@ -38,22 +49,22 @@ const mute = async (sock, msg, args, context) => {
     try {
         const groupMetadata = await sock.groupMetadata(context.from);
         
-        const senderNumber = normalizeNumber(context.sender);
+        console.log(`Debug - Raw sender JID: ${context.sender}`);
+        console.log(`Debug - Raw bot JID: ${sock.user.id}`);
+        console.log(`Debug - All participants:`, groupMetadata.participants.map(p => ({id: p.id, admin: p.admin})));
+        
         const senderParticipant = groupMetadata.participants.find(p => {
-            return normalizeNumber(p.id) === senderNumber;
+            return participantMatches(p.id, context.sender);
         });
         const isSenderAdmin = senderParticipant && (senderParticipant.admin === 'admin' || senderParticipant.admin === 'superadmin');
         
-        const botNumber = normalizeNumber(sock.user.id);
         const botParticipant = groupMetadata.participants.find(p => {
-            return normalizeNumber(p.id) === botNumber;
+            return participantMatches(p.id, sock.user.id);
         });
         const isBotAdmin = botParticipant && (botParticipant.admin === 'admin' || botParticipant.admin === 'superadmin');
         
-        console.log(`Debug - Bot Number: ${botNumber}, Is Bot Admin: ${isBotAdmin}`);
-        console.log(`Debug - Sender Number: ${senderNumber}, Is Sender Admin: ${isSenderAdmin}`);
-        console.log(`Debug - Raw sender JID: ${context.sender}`);
-        console.log(`Debug - Raw bot JID: ${sock.user.id}`);
+        console.log(`Debug - Is Bot Admin: ${isBotAdmin}, Bot Participant:`, botParticipant);
+        console.log(`Debug - Is Sender Admin: ${isSenderAdmin}, Sender Participant:`, senderParticipant);
         
         if (!isBotAdmin) {
             return await sock.sendMessage(context.from, { 
@@ -70,6 +81,8 @@ const mute = async (sock, msg, args, context) => {
         const durationInMinutes = args[0] ? parseInt(args[0]) : undefined;
         
         await sock.groupSettingUpdate(context.from, 'announcement');
+        
+        const senderNumber = normalizeNumber(context.sender);
         
         if (durationInMinutes !== undefined && durationInMinutes > 0 && !isNaN(durationInMinutes)) {
             const durationInMilliseconds = durationInMinutes * 60 * 1000;
