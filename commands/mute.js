@@ -29,12 +29,14 @@ const isOwner = (sender) => {
 };
 
 const participantMatches = (participantId, targetJid) => {
+    // First, try exact match
+    if (participantId === targetJid) {
+        return true;
+    }
+    
+    // Always compare normalized numbers as fallback
     const participantNum = normalizeNumber(participantId);
     const targetNum = normalizeNumber(targetJid);
-    
-    if (participantId.includes('@lid')) {
-        return participantId === targetJid;
-    }
     
     return participantNum === targetNum;
 };
