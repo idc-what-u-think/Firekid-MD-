@@ -4,6 +4,24 @@ const path = require('path');
 const DATA_DIR = path.join(process.cwd(), 'data');
 const CONFIG_FILE = path.join(DATA_DIR, 'private_mode.json');
 
+const normalizeNumber = (jidOrNum) => {
+  if (!jidOrNum) return '';
+  let str = jidOrNum.toString();
+
+  const atIndex = str.indexOf('@');
+  if (atIndex !== -1) {
+    const local = str.slice(0, atIndex);
+    const domain = str.slice(atIndex);
+    const cleanedLocal = local.split(':')[0];
+    str = cleanedLocal + domain;
+  } else {
+    str = str.split(':')[0];
+  }
+
+  const digits = str.replace(/[^0-9]/g, '');
+  return digits.replace(/^0+/, '');
+};
+
 const ensureDataDir = () => {
     try {
         if (!fs.existsSync(DATA_DIR)) {
@@ -46,16 +64,13 @@ const savePrivateMode = (enabled) => {
 const isOwner = (sender) => {
     const ownerNumber = process.env.OWNER_NUMBER;
     if (!ownerNumber) {
-        console.log('Owner check failed: OWNER_NUMBER not set in environment');
         return false;
     }
     
-    const senderNumber = sender.replace(/[^0-9]/g, '');
-    const ownerNum = ownerNumber.replace(/[^0-9]/g, '');
+    const senderNum = normalizeNumber(sender);
+    const ownerNum = normalizeNumber(ownerNumber);
     
-    console.log(`Owner check - Sender: ${senderNumber}, Owner: ${ownerNum}, Match: ${senderNumber === ownerNum}`);
-    
-    return senderNumber === ownerNum;
+    return senderNum === ownerNum;
 };
 
 const privateCmd = async (sock, msg, args, context) => {
@@ -81,8 +96,9 @@ const privateCmd = async (sock, msg, args, context) => {
 │ • ${context.prefix}private status
 │
 │ *When enabled:*
-│ Only the owner can use bot commands
-│ in groups. Other users will be ignored.
+│ Only the owner can use commands
+│ Sudo users can use commands in DM/groups
+│ Others will be ignored
 │
 ╰━━━━━━━━━━━━━━━━━━━━╯`
         }, { quoted: msg });
@@ -92,8 +108,8 @@ const privateCmd = async (sock, msg, args, context) => {
         const config = loadPrivateMode();
         const status = config.enabled ? 'ENABLED ✅' : 'DISABLED ❌';
         const description = config.enabled 
-            ? '✅ Bot only responds to owner in groups' 
-            : '❌ Bot responds to everyone in groups';
+            ? '✅ Bot only responds to owner and sudo users' 
+            : '❌ Bot responds to everyone';
         
         return await sock.sendMessage(context.from, {
             text: `🔒 *Private Mode Status:* ${status}\n\n${description}`
@@ -110,7 +126,7 @@ const privateCmd = async (sock, msg, args, context) => {
         
         if (savePrivateMode(true)) {
             return await sock.sendMessage(context.from, {
-                text: '✅ Private mode ENABLED\n\n🔒 Bot will now only respond to you in groups'
+                text: '✅ Private mode ENABLED\n\n🔒 Bot will now only respond to owner and sudo users'
             }, { quoted: msg });
         } else {
             return await sock.sendMessage(context.from, {
@@ -129,7 +145,7 @@ const privateCmd = async (sock, msg, args, context) => {
         
         if (savePrivateMode(false)) {
             return await sock.sendMessage(context.from, {
-                text: '✅ Private mode DISABLED\n\n🔓 Bot will now respond to everyone in groups'
+                text: '✅ Private mode DISABLED\n\n🔓 Bot will now respond to everyone'
             }, { quoted: msg });
         } else {
             return await sock.sendMessage(context.from, {
@@ -146,5 +162,6 @@ module.exports = {
         const config = loadPrivateMode();
         return config.enabled;
     },
-    isOwner
+    isOwner,
+    normalizeNumber
 };
