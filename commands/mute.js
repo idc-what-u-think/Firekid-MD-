@@ -28,10 +28,24 @@ const isOwner = (sender) => {
     return senderNum === ownerNum;
 };
 
-const participantMatches = (participantId, targetJid) => {
+const participantMatches = (participantId, targetJid, groupMetadata) => {
     // First, try exact match
     if (participantId === targetJid) {
         return true;
+    }
+    
+    // If targetJid is in @s.whatsapp.net format, look for a participant with matching LID
+    if (targetJid.includes('@s.whatsapp.net') && groupMetadata) {
+        const targetNumber = normalizeNumber(targetJid);
+        
+        // Check if any participant has a jid matching the target
+        const matchingParticipant = groupMetadata.participants.find(p => {
+            return normalizeNumber(p.jid || p.id) === targetNumber;
+        });
+        
+        if (matchingParticipant && matchingParticipant.id === participantId) {
+            return true;
+        }
     }
     
     // Always compare normalized numbers as fallback
@@ -53,15 +67,15 @@ const mute = async (sock, msg, args, context) => {
         
         console.log(`Debug - Raw sender JID: ${context.sender}`);
         console.log(`Debug - Raw bot JID: ${sock.user.id}`);
-        console.log(`Debug - All participants:`, groupMetadata.participants.map(p => ({id: p.id, admin: p.admin})));
+        console.log(`Debug - All participants:`, groupMetadata.participants.map(p => ({id: p.id, jid: p.jid, admin: p.admin})));
         
         const senderParticipant = groupMetadata.participants.find(p => {
-            return participantMatches(p.id, context.sender);
+            return participantMatches(p.id, context.sender, groupMetadata);
         });
         const isSenderAdmin = senderParticipant && (senderParticipant.admin === 'admin' || senderParticipant.admin === 'superadmin');
         
         const botParticipant = groupMetadata.participants.find(p => {
-            return participantMatches(p.id, sock.user.id);
+            return participantMatches(p.id, sock.user.id, groupMetadata);
         });
         const isBotAdmin = botParticipant && (botParticipant.admin === 'admin' || botParticipant.admin === 'superadmin');
         
