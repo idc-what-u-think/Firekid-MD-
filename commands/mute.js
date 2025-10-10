@@ -11,7 +11,18 @@ const isOwner = (sender) => {
 };
 
 const extractNumber = (jid) => {
-    return jid.replace(/[^0-9]/g, '');
+    if (!jid) return '';
+    
+    let cleanJid = jid;
+    if (cleanJid.includes(':')) {
+        cleanJid = cleanJid.split(':')[0] + '@s.whatsapp.net';
+    }
+    
+    const number = cleanJid.split('@')[0].replace(/[^0-9]/g, '');
+    
+    console.log(`Extract Debug - Input: ${jid}, Output: ${number}`);
+    
+    return number;
 };
 
 const mute = async (sock, msg, args, context) => {
