@@ -1,11 +1,52 @@
+const normalizeNumber = (jidOrNum) => {
+  if (!jidOrNum) return '';
+  let str = jidOrNum.toString();
+
+  const atIndex = str.indexOf('@');
+  if (atIndex !== -1) {
+    const local = str.slice(0, atIndex);
+    const domain = str.slice(atIndex);
+    const cleanedLocal = local.split(':')[0];
+    str = cleanedLocal + domain;
+  } else {
+    str = str.split(':')[0];
+  }
+
+  const digits = str.replace(/[^0-9]/g, '');
+  return digits.replace(/^0+/, '');
+};
+
 const isOwner = (sender) => {
     const ownerNumber = process.env.OWNER_NUMBER;
     if (!ownerNumber) return false;
     
-    const senderNumber = sender.split('@')[0].split(':')[0];
-    const ownerNum = ownerNumber.replace(/[^0-9]/g, '');
+    const senderNum = normalizeNumber(sender);
+    const ownerNum = normalizeNumber(ownerNumber);
     
-    return senderNumber === ownerNum;
+    return senderNum === ownerNum;
+};
+
+const participantMatches = (participantId, targetJid, groupMetadata) => {
+    if (participantId === targetJid) {
+        return true;
+    }
+    
+    if (targetJid.includes('@s.whatsapp.net') && groupMetadata) {
+        const targetNumber = normalizeNumber(targetJid);
+        
+        const matchingParticipant = groupMetadata.participants.find(p => {
+            return normalizeNumber(p.jid || p.id) === targetNumber;
+        });
+        
+        if (matchingParticipant && matchingParticipant.id === participantId) {
+            return true;
+        }
+    }
+    
+    const participantNum = normalizeNumber(participantId);
+    const targetNum = normalizeNumber(targetJid);
+    
+    return participantNum === targetNum;
 };
 
 const unmute = async (sock, msg, args, context) => {
@@ -18,17 +59,13 @@ const unmute = async (sock, msg, args, context) => {
     try {
         const groupMetadata = await sock.groupMetadata(context.from);
         
-        const senderNumber = context.sender.split('@')[0].split(':')[0];
         const senderParticipant = groupMetadata.participants.find(p => {
-            const pNum = p.id.split('@')[0].split(':')[0];
-            return pNum === senderNumber;
+            return participantMatches(p.id, context.sender, groupMetadata);
         });
         const isSenderAdmin = senderParticipant && (senderParticipant.admin === 'admin' || senderParticipant.admin === 'superadmin');
         
-        const botNumber = sock.user.id.split(':')[0];
         const botParticipant = groupMetadata.participants.find(p => {
-            const pNum = p.id.split('@')[0].split(':')[0];
-            return pNum === botNumber;
+            return participantMatches(p.id, sock.user.id, groupMetadata);
         });
         const isBotAdmin = botParticipant && (botParticipant.admin === 'admin' || botParticipant.admin === 'superadmin');
         
@@ -46,6 +83,7 @@ const unmute = async (sock, msg, args, context) => {
         
         await sock.groupSettingUpdate(context.from, 'not_announcement');
         
+        const senderNumber = normalizeNumber(context.sender);
         const time = new Date().toLocaleTimeString();
         const unmuteMsg = `🔊 Group has been unmuted by @${senderNumber}\nTime: ${time}`;
         
