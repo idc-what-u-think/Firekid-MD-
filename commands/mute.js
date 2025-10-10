@@ -1,28 +1,31 @@
+const normalizeNumber = (jidOrNum) => {
+  if (!jidOrNum) return '';
+  let str = jidOrNum.toString();
+
+  const atIndex = str.indexOf('@');
+  if (atIndex !== -1) {
+    const local = str.slice(0, atIndex);
+    const domain = str.slice(atIndex);
+    const cleanedLocal = local.split(':')[0];
+    str = cleanedLocal + domain;
+  } else {
+    str = str.split(':')[0];
+  }
+
+  const digits = str.replace(/[^0-9]/g, '');
+  return digits.replace(/^0+/, '');
+};
+
 const isOwner = (sender) => {
     const ownerNumber = process.env.OWNER_NUMBER;
     if (!ownerNumber) return false;
     
-    const senderNumber = sender.replace(/[^0-9]/g, '');
-    const ownerNum = ownerNumber.replace(/[^0-9]/g, '');
+    const senderNum = normalizeNumber(sender);
+    const ownerNum = normalizeNumber(ownerNumber);
     
-    console.log(`Owner check - Sender: ${senderNumber}, Owner: ${ownerNum}, Match: ${senderNumber === ownerNum}`);
+    console.log(`Owner check - Sender: ${senderNum}, Owner: ${ownerNum}, Match: ${senderNum === ownerNum}`);
     
-    return senderNumber === ownerNum;
-};
-
-const extractNumber = (jid) => {
-    if (!jid) return '';
-    
-    let cleanJid = jid;
-    if (cleanJid.includes(':')) {
-        cleanJid = cleanJid.split(':')[0] + '@s.whatsapp.net';
-    }
-    
-    const number = cleanJid.split('@')[0].replace(/[^0-9]/g, '');
-    
-    console.log(`Extract Debug - Input: ${jid}, Output: ${number}`);
-    
-    return number;
+    return senderNum === ownerNum;
 };
 
 const mute = async (sock, msg, args, context) => {
@@ -35,20 +38,22 @@ const mute = async (sock, msg, args, context) => {
     try {
         const groupMetadata = await sock.groupMetadata(context.from);
         
-        const senderNumber = extractNumber(context.sender);
+        const senderNumber = normalizeNumber(context.sender);
         const senderParticipant = groupMetadata.participants.find(p => {
-            return extractNumber(p.id) === senderNumber;
+            return normalizeNumber(p.id) === senderNumber;
         });
         const isSenderAdmin = senderParticipant && (senderParticipant.admin === 'admin' || senderParticipant.admin === 'superadmin');
         
-        const botNumber = extractNumber(sock.user.id);
+        const botNumber = normalizeNumber(sock.user.id);
         const botParticipant = groupMetadata.participants.find(p => {
-            return extractNumber(p.id) === botNumber;
+            return normalizeNumber(p.id) === botNumber;
         });
         const isBotAdmin = botParticipant && (botParticipant.admin === 'admin' || botParticipant.admin === 'superadmin');
         
         console.log(`Debug - Bot Number: ${botNumber}, Is Bot Admin: ${isBotAdmin}`);
         console.log(`Debug - Sender Number: ${senderNumber}, Is Sender Admin: ${isSenderAdmin}`);
+        console.log(`Debug - Raw sender JID: ${context.sender}`);
+        console.log(`Debug - Raw bot JID: ${sock.user.id}`);
         
         if (!isBotAdmin) {
             return await sock.sendMessage(context.from, { 
