@@ -45,6 +45,24 @@ const countryCodes = {
     '64': 'New Zealand'
 };
 
+const normalizeNumber = (jidOrNum) => {
+  if (!jidOrNum) return '';
+  let str = jidOrNum.toString();
+
+  const atIndex = str.indexOf('@');
+  if (atIndex !== -1) {
+    const local = str.slice(0, atIndex);
+    const domain = str.slice(atIndex);
+    const cleanedLocal = local.split(':')[0];
+    str = cleanedLocal + domain;
+  } else {
+    str = str.split(':')[0];
+  }
+
+  const digits = str.replace(/[^0-9]/g, '');
+  return digits.replace(/^0+/, '');
+};
+
 const ensureDataDir = () => {
     try {
         if (!fs.existsSync(DATA_DIR)) {
@@ -119,10 +137,10 @@ const isOwner = (sender) => {
     const ownerNumber = process.env.OWNER_NUMBER;
     if (!ownerNumber) return false;
     
-    const senderNumber = sender.split('@')[0].split(':')[0];
-    const ownerNum = ownerNumber.replace(/[^0-9]/g, '');
+    const senderNum = normalizeNumber(sender);
+    const ownerNum = normalizeNumber(ownerNumber);
     
-    return senderNumber === ownerNum;
+    return senderNum === ownerNum;
 };
 
 const extractMentionedJid = (msg) => {
@@ -278,5 +296,6 @@ module.exports = {
     command: 'sudo',
     handler: sudo,
     isSudo,
-    isOwner
+    isOwner,
+    normalizeNumber
 };
