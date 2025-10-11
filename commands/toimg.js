@@ -51,7 +51,7 @@ const toimg = async (sock, msg, args, context) => {
 
             fs.writeFileSync(tempInput, buffer);
 
-            const ffmpegCommand = `ffmpeg -i "${tempInput}" -vf "scale=512:512:force_original_aspect_ratio=decrease,pad=512:512:(ow-iw)/2:(oh-ih)/2:white" -c:v libx264 -pix_fmt yuv420p -movflags +faststart -t 10 "${tempOutput}"`;
+            const ffmpegCommand = `ffmpeg -i "${tempInput}" -vcodec libx264 -pix_fmt yuv420p -movflags +faststart "${tempOutput}"`;
 
             await new Promise((resolve, reject) => {
                 exec(ffmpegCommand, (error) => {
@@ -65,7 +65,7 @@ const toimg = async (sock, msg, args, context) => {
             });
 
             if (!fs.existsSync(tempOutput)) {
-                throw new Error('Video conversion failed');
+                throw new Error('Video conversion failed - output file not created');
             }
 
             const videoBuffer = fs.readFileSync(tempOutput);
