@@ -74,7 +74,17 @@ const isOwner = (sender) => {
 };
 
 const privateCmd = async (sock, msg, args, context) => {
-    if (!isOwner(context.sender)) {
+    const sender = context.sender;
+    const isOwnerCheck = isOwner(sender);
+    
+    console.log(`[Private Command Debug]`);
+    console.log(`  Sender: ${sender}`);
+    console.log(`  Owner Number (env): ${process.env.OWNER_NUMBER}`);
+    console.log(`  Is Owner: ${isOwnerCheck}`);
+    console.log(`  Normalized Sender: ${normalizeNumber(sender)}`);
+    console.log(`  Normalized Owner: ${normalizeNumber(process.env.OWNER_NUMBER)}`);
+    
+    if (!isOwnerCheck) {
         return await sock.sendMessage(context.from, {
             text: '❌ This command is only available to the bot owner'
         }, { quoted: msg });
