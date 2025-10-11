@@ -95,7 +95,7 @@ const downloadSong = async (spotifyUrl) => {
 const song = async (sock, msg, args, context) => {
     if (!args[0]) {
         return await sock.sendMessage(context.from, { 
-            text: `❌ Please provide a song name\n\nExample: ${context.prefix}song Shape of You Ed Sheeran` 
+            text: `❌ Please provide a song name or Spotify URL\n\nExamples:\n${context.prefix}song Shape of You\n${context.prefix}song https://open.spotify.com/track/...` 
         }, { quoted: msg });
     }
     
@@ -104,55 +104,58 @@ const song = async (sock, msg, args, context) => {
             text: '⏳ Searching for song...' 
         }, { quoted: msg });
         
-        const songName = args.join(' ');
-        const songData = await searchSpotify(songName);
+        const songInput = args.join(' ');
+        let downloadLink = null;
+        let songTitle = '';
+        let songArtist = '';
         
-        if (!songData) {
-            return await sock.sendMessage(context.from, { 
-                text: '❌ Song not found. Please try a different search term.' 
-            }, { quoted: msg });
-        }
-
-        if (!songData.link) {
-            return await sock.sendMessage(context.from, { 
-                text: '❌ Invalid song data received. Please try again.' 
-            }, { quoted: msg });
-        }
-
-        await sock.sendMessage(context.from, { 
-            text: '⏳ Downloading song...' 
-        }, { quoted: msg });
-
-        const downloadLink = await downloadSong(songData.link);
+        const isSpotifyUrl = songInput.includes('spotify.com');
         
-        if (!downloadLink) {
-            return await sock.sendMessage(context.from, { 
-                text: '❌ Failed to get song download link. Please try again.' 
+        if (isSpotifyUrl) {
+            downloadLink = await downloadSong(songInput);
+            if (!downloadLink) {
+                return await sock.sendMessage(context.from, { 
+                    text: '❌ Failed to download from Spotify URL. Please try again.' 
+                }, { quoted: msg });
+            }
+            songTitle = 'Spotify Track';
+            songArtist = 'Unknown Artist';
+        } else {
+            const songData = await searchSpotify(songInput);
+            
+            if (!songData) {
+                return await sock.sendMessage(context.from, { 
+                    text: '❌ Song not found. Please try a different search term.' 
+                }, { quoted: msg });
+            }
+
+            if (!songData.link) {
+                return await sock.sendMessage(context.from, { 
+                    text: '❌ Invalid song data received. Please try again.' 
+                }, { quoted: msg });
+            }
+
+            await sock.sendMessage(context.from, { 
+                text: '⏳ Downloading song...' 
             }, { quoted: msg });
+
+            downloadLink = await downloadSong(songData.link);
+            
+            if (!downloadLink) {
+                return await sock.sendMessage(context.from, { 
+                    text: '❌ Failed to get song download link. Please try again.' 
+                }, { quoted: msg });
+            }
+            
+            songTitle = songData.title || 'Unknown Title';
+            songArtist = songData.artist || 'Unknown Artist';
         }
 
         const audioMessage = {
             audio: { url: downloadLink },
             mimetype: 'audio/mpeg',
-            fileName: `${songData.title || 'song'}.mp3`
+            fileName: `${songTitle}.mp3`
         };
-
-        if (songData.image) {
-            try {
-                audioMessage.contextInfo = {
-                    externalAdReply: {
-                        title: songData.title || 'Unknown Title',
-                        body: songData.artist || 'Unknown Artist',
-                        thumbnailUrl: songData.image,
-                        sourceUrl: downloadLink,
-                        mediaType: 1,
-                        showAdAttribution: false
-                    }
-                };
-            } catch (thumbError) {
-                console.error('Thumbnail error:', thumbError.message);
-            }
-        }
 
         await sock.sendMessage(context.from, audioMessage, { quoted: msg });
         
