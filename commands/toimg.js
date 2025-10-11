@@ -27,7 +27,6 @@ const toimg = async (sock, msg, args, context) => {
         }, { quoted: msg });
 
         const isAnimated = stickerMessage.isAnimated || stickerMessage.seconds > 0;
-
         const stream = await downloadContentFromMessage(stickerMessage, 'sticker');
         let buffer = Buffer.from([]);
         
@@ -52,7 +51,7 @@ const toimg = async (sock, msg, args, context) => {
 
             fs.writeFileSync(tempInput, buffer);
 
-            const ffmpegCommand = `ffmpeg -i "${tempInput}" -c:v libx264 -pix_fmt yuv420p -movflags +faststart "${tempOutput}"`;
+            const ffmpegCommand = `ffmpeg -i "${tempInput}" -vf "scale=512:512:force_original_aspect_ratio=decrease,pad=512:512:(ow-iw)/2:(oh-ih)/2:white" -c:v libx264 -pix_fmt yuv420p -movflags +faststart -t 10 "${tempOutput}"`;
 
             await new Promise((resolve, reject) => {
                 exec(ffmpegCommand, (error) => {
@@ -64,6 +63,10 @@ const toimg = async (sock, msg, args, context) => {
                     }
                 });
             });
+
+            if (!fs.existsSync(tempOutput)) {
+                throw new Error('Video conversion failed');
+            }
 
             const videoBuffer = fs.readFileSync(tempOutput);
 
@@ -79,7 +82,6 @@ const toimg = async (sock, msg, args, context) => {
             } catch (err) {
                 console.error('Error cleaning up temp files:', err);
             }
-
         } else {
             const imageBuffer = await sharp(buffer)
                 .toFormat('png')
@@ -90,9 +92,15 @@ const toimg = async (sock, msg, args, context) => {
                 caption: '✅ Sticker converted to image'
             }, { quoted: msg });
         }
-
     } catch (error) {
         console.error('Error in toimg command:', error.message);
+        
+        if (error.message.includes('FFmpeg')) {
+            return await sock.sendMessage(context.from, { 
+                text: '❌ Failed to convert animated sticker. FFmpeg error occurred.'
+            }, { quoted: msg });
+        }
+
         return await sock.sendMessage(context.from, { 
             text: '❌ Failed to convert sticker. Make sure you replied to a valid sticker.'
         }, { quoted: msg });
