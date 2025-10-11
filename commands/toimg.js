@@ -47,16 +47,34 @@ const toimg = async (sock, msg, args, context) => {
 
         if (isAnimated) {
             const tempInput = path.join(tmpDir, `sticker_${Date.now()}.webp`);
+            const tempGif = path.join(tmpDir, `sticker_${Date.now()}.gif`);
             const tempOutput = path.join(tmpDir, `video_${Date.now()}.mp4`);
 
             fs.writeFileSync(tempInput, buffer);
 
-            const ffmpegCommand = `ffmpeg -i "${tempInput}" -vcodec libx264 -pix_fmt yuv420p -movflags +faststart "${tempOutput}"`;
+            const webpToGifCommand = `ffmpeg -i "${tempInput}" -analyzeduration 5000000 -probesize 5000000 "${tempGif}"`;
 
             await new Promise((resolve, reject) => {
-                exec(ffmpegCommand, (error) => {
+                exec(webpToGifCommand, (error) => {
                     if (error) {
-                        console.error('FFmpeg error:', error);
+                        console.error('WebP to GIF error:', error);
+                        reject(error);
+                    } else {
+                        resolve();
+                    }
+                });
+            });
+
+            if (!fs.existsSync(tempGif)) {
+                throw new Error('WebP to GIF conversion failed');
+            }
+
+            const gifToMp4Command = `ffmpeg -i "${tempGif}" -c:v libx264 -pix_fmt yuv420p -movflags +faststart "${tempOutput}"`;
+
+            await new Promise((resolve, reject) => {
+                exec(gifToMp4Command, (error) => {
+                    if (error) {
+                        console.error('GIF to MP4 error:', error);
                         reject(error);
                     } else {
                         resolve();
@@ -65,7 +83,7 @@ const toimg = async (sock, msg, args, context) => {
             });
 
             if (!fs.existsSync(tempOutput)) {
-                throw new Error('Video conversion failed - output file not created');
+                throw new Error('GIF to MP4 conversion failed');
             }
 
             const videoBuffer = fs.readFileSync(tempOutput);
@@ -78,6 +96,7 @@ const toimg = async (sock, msg, args, context) => {
 
             try {
                 fs.unlinkSync(tempInput);
+                fs.unlinkSync(tempGif);
                 fs.unlinkSync(tempOutput);
             } catch (err) {
                 console.error('Error cleaning up temp files:', err);
