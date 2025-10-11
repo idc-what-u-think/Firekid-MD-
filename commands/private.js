@@ -77,27 +77,17 @@ const privateCmd = async (sock, msg, args, context) => {
     let sender = context.sender;
     let isOwnerCheck = isOwner(sender);
     
-    console.log(`[Private Command Debug]`);
-    console.log(`  Sender: ${sender}`);
-    console.log(`  Owner Number (env): ${process.env.OWNER_NUMBER}`);
-    console.log(`  Is Owner: ${isOwnerCheck}`);
-    console.log(`  Normalized Sender: ${normalizeNumber(sender)}`);
-    console.log(`  Normalized Owner: ${normalizeNumber(process.env.OWNER_NUMBER)}`);
-    
     if (!isOwnerCheck && context.isGroup && sender.includes('@lid')) {
-        console.log(`[Private] Sender is in @lid format, checking group metadata...`);
         try {
             const groupMetadata = await sock.groupMetadata(context.from);
             const senderParticipant = groupMetadata.participants.find(p => p.id === sender);
             
             if (senderParticipant && senderParticipant.jid) {
-                console.log(`[Private] Found jid for @lid sender: ${senderParticipant.jid}`);
                 sender = senderParticipant.jid;
                 isOwnerCheck = isOwner(sender);
-                console.log(`[Private] Re-checking owner with jid - Is Owner: ${isOwnerCheck}`);
             }
         } catch (err) {
-            console.error(`[Private] Error fetching group metadata:`, err.message);
+            console.error('Error fetching group metadata:', err.message);
         }
     }
     
