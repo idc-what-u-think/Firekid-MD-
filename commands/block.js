@@ -1,11 +1,29 @@
+const normalizeNumber = (jidOrNum) => {
+  if (!jidOrNum) return '';
+  let str = jidOrNum.toString();
+
+  const atIndex = str.indexOf('@');
+  if (atIndex !== -1) {
+    const local = str.slice(0, atIndex);
+    const domain = str.slice(atIndex);
+    const cleanedLocal = local.split(':')[0];
+    str = cleanedLocal + domain;
+  } else {
+    str = str.split(':')[0];
+  }
+
+  const digits = str.replace(/[^0-9]/g, '');
+  return digits.replace(/^0+/, '');
+};
+
 const isOwner = (sender) => {
     const ownerNumber = process.env.OWNER_NUMBER;
     if (!ownerNumber) return false;
     
-    const senderNumber = sender.split('@')[0].split(':')[0];
-    const ownerNum = ownerNumber.replace(/[^0-9]/g, '');
+    const senderNum = normalizeNumber(sender);
+    const ownerNum = normalizeNumber(ownerNumber);
     
-    return senderNumber === ownerNum;
+    return senderNum === ownerNum;
 };
 
 const blockUser = async (sock, msg, args, context) => {
@@ -28,7 +46,7 @@ const blockUser = async (sock, msg, args, context) => {
         let userToBlock;
         
         if (quotedSender) {
-            userToBlock = quotedSender.split(':')[0];
+            userToBlock = quotedSender;
             if (!userToBlock.includes('@')) {
                 userToBlock = userToBlock + '@s.whatsapp.net';
             }
@@ -37,7 +55,7 @@ const blockUser = async (sock, msg, args, context) => {
             userToBlock = number + '@s.whatsapp.net';
         }
         
-        const userNumber = userToBlock.split('@')[0].split(':')[0];
+        const userNumber = userToBlock.split('@')[0];
         if (isOwner(userToBlock)) {
             return await sock.sendMessage(context.from, { 
                 text: '❌ You cannot block yourself' 
@@ -78,7 +96,7 @@ const unblockUser = async (sock, msg, args, context) => {
         let userToUnblock;
         
         if (quotedSender) {
-            userToUnblock = quotedSender.split(':')[0];
+            userToUnblock = quotedSender;
             if (!userToUnblock.includes('@')) {
                 userToUnblock = userToUnblock + '@s.whatsapp.net';
             }
@@ -87,7 +105,7 @@ const unblockUser = async (sock, msg, args, context) => {
             userToUnblock = number + '@s.whatsapp.net';
         }
         
-        const userNumber = userToUnblock.split('@')[0].split(':')[0];
+        const userNumber = userToUnblock.split('@')[0];
         
         await sock.updateBlockStatus(userToUnblock, 'unblock');
         
