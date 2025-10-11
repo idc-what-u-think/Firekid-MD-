@@ -154,6 +154,16 @@ const extractMentionedJid = (msg) => {
 };
 
 const sudo = async (sock, msg, args, context) => {
+    const sender = context.sender;
+    const isOwnerCheck = isOwner(sender);
+    
+    console.log(`[Sudo Command Debug]`);
+    console.log(`  Sender: ${sender}`);
+    console.log(`  Owner Number (env): ${process.env.OWNER_NUMBER}`);
+    console.log(`  Is Owner: ${isOwnerCheck}`);
+    console.log(`  Normalized Sender: ${normalizeNumber(sender)}`);
+    console.log(`  Normalized Owner: ${normalizeNumber(process.env.OWNER_NUMBER)}`);
+    
     const action = args[0]?.toLowerCase();
     
     if (!action || !['add', 'remove', 'del', 'list'].includes(action)) {
@@ -202,7 +212,8 @@ const sudo = async (sock, msg, args, context) => {
             }, { quoted: msg });
         }
 
-        if (!isOwner(context.sender)) {
+        if (!isOwnerCheck) {
+            console.log(`[Sudo Debug] User is not owner. Rejecting add/remove.`);
             return await sock.sendMessage(context.from, {
                 text: '❌ Only the bot owner can add/remove sudo users'
             }, { quoted: msg });
