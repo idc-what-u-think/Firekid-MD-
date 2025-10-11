@@ -54,17 +54,20 @@ const downloadSong = async (spotifyUrl) => {
     const api = getNextApi();
     
     try {
-        const response = await axios.get(
-            `https://${api.host}/downloadSong`,
-            {
-                params: { songId: spotifyUrl },
-                headers: {
-                    'x-rapidapi-key': api.key,
-                    'x-rapidapi-host': api.host
-                },
-                timeout: 15000
-            }
-        );
+        const options = {
+            method: 'GET',
+            url: `https://${api.host}/downloadSong`,
+            params: {
+                songId: spotifyUrl
+            },
+            headers: {
+                'x-rapidapi-key': api.key,
+                'x-rapidapi-host': api.host
+            },
+            timeout: 15000
+        };
+
+        const response = await axios.request(options);
 
         if (response.data && response.data.link) {
             return response.data.link;
@@ -72,6 +75,10 @@ const downloadSong = async (spotifyUrl) => {
 
         if (response.data && response.data.url) {
             return response.data.url;
+        }
+
+        if (response.data && response.data.downloadUrl) {
+            return response.data.downloadUrl;
         }
 
         if (response.data && typeof response.data === 'string' && response.data.startsWith('http')) {
