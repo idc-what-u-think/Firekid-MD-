@@ -154,8 +154,8 @@ const extractMentionedJid = (msg) => {
 };
 
 const sudo = async (sock, msg, args, context) => {
-    const sender = context.sender;
-    const isOwnerCheck = isOwner(sender);
+    let sender = context.sender;
+    let isOwnerCheck = isOwner(sender);
     
     console.log(`[Sudo Command Debug]`);
     console.log(`  Sender: ${sender}`);
@@ -163,6 +163,23 @@ const sudo = async (sock, msg, args, context) => {
     console.log(`  Is Owner: ${isOwnerCheck}`);
     console.log(`  Normalized Sender: ${normalizeNumber(sender)}`);
     console.log(`  Normalized Owner: ${normalizeNumber(process.env.OWNER_NUMBER)}`);
+    
+    if (!isOwnerCheck && context.isGroup && sender.includes('@lid')) {
+        console.log(`[Sudo] Sender is in @lid format, checking group metadata...`);
+        try {
+            const groupMetadata = await sock.groupMetadata(context.from);
+            const senderParticipant = groupMetadata.participants.find(p => p.id === sender);
+            
+            if (senderParticipant && senderParticipant.jid) {
+                console.log(`[Sudo] Found jid for @lid sender: ${senderParticipant.jid}`);
+                sender = senderParticipant.jid;
+                isOwnerCheck = isOwner(sender);
+                console.log(`[Sudo] Re-checking owner with jid - Is Owner: ${isOwnerCheck}`);
+            }
+        } catch (err) {
+            console.error(`[Sudo] Error fetching group metadata:`, err.message);
+        }
+    }
     
     const action = args[0]?.toLowerCase();
     
