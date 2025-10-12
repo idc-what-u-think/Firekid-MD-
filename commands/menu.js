@@ -94,7 +94,6 @@ const menu = async (sock, msg, args, context) => {
 │ • block - Block users
 │ • unlock - Unblock users
 │ • private - Private mode toggle
-│ • update - Update commands
 │ 
 ╰━━━━━━━━━━━━━━━━━━━━╯
 ┏━━━━━━━━━━━━━━━━━━━┓
