@@ -26,14 +26,13 @@ const update = async (sock, msg, args, context) => {
             text: '⏳ Updating commands from GitHub...'
         }, { quoted: msg });
 
-        const path = require('path');
-        const mainDir = path.join(__dirname, '..', '..', '..');
-        const { reloadCommandsFromGitHub } = require(path.join(mainDir, 'utils', 'commandLoader'));
-        
-        const newCommands = await reloadCommandsFromGitHub(
-            process.env.GITHUB_TOKEN,
-            'https://github.com/idc-what-u-think/Firekid-MD-.git'
-        );
+        if (!global.reloadCommands) {
+            return await sock.sendMessage(context.from, {
+                text: '❌ Reload function not available'
+            }, { quoted: msg });
+        }
+
+        const newCommands = await global.reloadCommands();
 
         if (!newCommands || Object.keys(newCommands).length === 0) {
             return await sock.sendMessage(context.from, {
