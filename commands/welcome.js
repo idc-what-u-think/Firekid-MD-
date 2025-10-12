@@ -41,7 +41,7 @@ const participantMatches = (participantId, targetJid, groupMetadata) => {
     return participantNum === targetNum;
 };
 
-const joinHandler = async (sock, msg, args, context) => {
+const welcomeHandler = async (sock, msg, args, context) => {
     if (!context.isGroup) {
         return await sock.sendMessage(context.from, { 
             text: '❌ This command is only for groups' 
@@ -65,13 +65,13 @@ const joinHandler = async (sock, msg, args, context) => {
         joinMessageEnabled.add(context.from);
         
         return await sock.sendMessage(context.from, { 
-            text: '✅ Join message notification has been enabled' 
+            text: '✅ Welcome message notification has been enabled' 
         }, { quoted: msg });
         
     } catch (error) {
-        console.error('Error in join command:', error.message);
+        console.error('Error in welcome command:', error.message);
         return await sock.sendMessage(context.from, { 
-            text: '❌ Failed to enable join message' 
+            text: '❌ Failed to enable welcome message' 
         }, { quoted: msg });
     }
 };
@@ -101,8 +101,8 @@ const isJoinEnabled = (groupId) => {
 };
 
 module.exports = {
-    command: 'join',
-    handler: joinHandler,
+    command: 'welcome',
+    handler: welcomeHandler,
     handleJoin,
     isJoinEnabled
 };
