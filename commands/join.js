@@ -1,38 +1,108 @@
-const joinHandler = async (m, client) => {
-    if (!m.isGroup) return m.reply('❌ This command is only for groups')
-    
-    const groupMetadata = await client.groupMetadata(m.chat)
-    const isAdmin = groupMetadata.participants.find(p => p.id === m.sender)?.admin
-    
-    if (!isAdmin) return m.reply('❌ This command is only for admins')
+const joinMessageEnabled = new Set();
 
-    try {
-        // Enable join message for group
-        // Store in bot's group settings (implementation depends on bot's storage system)
-        client.joinMessageEnabled = client.joinMessageEnabled || new Set()
-        client.joinMessageEnabled.add(m.chat)
-        
-        return m.reply('✅ Join message notification has been enabled')
-    } catch (error) {
-        console.error('Error in join command:', error)
-        return m.reply('❌ Failed to enable join message')
+const normalizeNumber = (jidOrNum) => {
+  if (!jidOrNum) return '';
+  let str = jidOrNum.toString();
+
+  const atIndex = str.indexOf('@');
+  if (atIndex !== -1) {
+    const local = str.slice(0, atIndex);
+    const domain = str.slice(atIndex);
+    const cleanedLocal = local.split(':')[0];
+    str = cleanedLocal + domain;
+  } else {
+    str = str.split(':')[0];
+  }
+
+  const digits = str.replace(/[^0-9]/g, '');
+  return digits.replace(/^0+/, '');
+};
+
+const participantMatches = (participantId, targetJid, groupMetadata) => {
+    if (participantId === targetJid) {
+        return true;
     }
-}
+    
+    if (targetJid.includes('@s.whatsapp.net') && groupMetadata) {
+        const targetNumber = normalizeNumber(targetJid);
+        
+        const matchingParticipant = groupMetadata.participants.find(p => {
+            return normalizeNumber(p.jid || p.id) === targetNumber;
+        });
+        
+        if (matchingParticipant && matchingParticipant.id === participantId) {
+            return true;
+        }
+    }
+    
+    const participantNum = normalizeNumber(participantId);
+    const targetNum = normalizeNumber(targetJid);
+    
+    return participantNum === targetNum;
+};
 
-// Event handler for when someone joins
-const handleJoin = async (groupMetadata, num, client) => {
-    if (!client.joinMessageEnabled?.has(groupMetadata.id)) return
+const joinHandler = async (sock, msg, args, context) => {
+    if (!context.isGroup) {
+        return await sock.sendMessage(context.from, { 
+            text: '❌ This command is only for groups' 
+        }, { quoted: msg });
+    }
     
-    const welcomeMsg = `Hi @${num.split('@')[0]}, Welcome to ${groupMetadata.subject}, enjoy your stay`
+    try {
+        const groupMetadata = await sock.groupMetadata(context.from);
+        
+        const senderParticipant = groupMetadata.participants.find(p => {
+            return participantMatches(p.id, context.sender, groupMetadata);
+        });
+        const isSenderAdmin = senderParticipant && (senderParticipant.admin === 'admin' || senderParticipant.admin === 'superadmin');
+        
+        if (!isSenderAdmin) {
+            return await sock.sendMessage(context.from, { 
+                text: '❌ This command is only for admins' 
+            }, { quoted: msg });
+        }
+        
+        joinMessageEnabled.add(context.from);
+        
+        return await sock.sendMessage(context.from, { 
+            text: '✅ Join message notification has been enabled' 
+        }, { quoted: msg });
+        
+    } catch (error) {
+        console.error('Error in join command:', error.message);
+        return await sock.sendMessage(context.from, { 
+            text: '❌ Failed to enable join message' 
+        }, { quoted: msg });
+    }
+};
+
+const handleJoin = async (sock, groupId, participants) => {
+    if (!joinMessageEnabled.has(groupId)) return;
     
-    await client.sendMessage(groupMetadata.id, {
-        text: welcomeMsg,
-        mentions: [num]
-    })
-}
+    try {
+        const groupMetadata = await sock.groupMetadata(groupId);
+        
+        for (const participant of participants) {
+            const participantNumber = normalizeNumber(participant);
+            const welcomeMsg = `Welcome @${participantNumber} to ${groupMetadata.subject}\nEnjoy`;
+            
+            await sock.sendMessage(groupId, {
+                text: welcomeMsg,
+                mentions: [participant]
+            });
+        }
+    } catch (error) {
+        console.error('Error in handleJoin:', error.message);
+    }
+};
+
+const isJoinEnabled = (groupId) => {
+    return joinMessageEnabled.has(groupId);
+};
 
 module.exports = {
     command: 'join',
     handler: joinHandler,
-    handleJoin // Export event handler for join events
-}
+    handleJoin,
+    isJoinEnabled
+};
