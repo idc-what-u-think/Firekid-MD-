@@ -26,9 +26,9 @@ const update = async (sock, msg, args, context) => {
             text: '⏳ Updating commands from GitHub...'
         }, { quoted: msg });
 
-        const { loadCommands } = require('./utils/commandLoader');
+        const { loadCommandsFromGitHub } = require('./commandLoader');
         
-        const newCommands = await loadCommands(
+        const newCommands = await loadCommandsFromGitHub(
             process.env.GITHUB_TOKEN,
             'https://github.com/idc-what-u-think/Firekid-MD-.git'
         );
