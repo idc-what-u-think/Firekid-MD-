@@ -26,7 +26,9 @@ const update = async (sock, msg, args, context) => {
             text: '⏳ Updating commands from GitHub...'
         }, { quoted: msg });
 
-        const { reloadCommandsFromGitHub } = require('../utils/commandLoader');
+        const path = require('path');
+        const mainDir = path.join(__dirname, '..', '..', '..');
+        const { reloadCommandsFromGitHub } = require(path.join(mainDir, 'utils', 'commandLoader'));
         
         const newCommands = await reloadCommandsFromGitHub(
             process.env.GITHUB_TOKEN,
