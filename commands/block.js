@@ -30,16 +30,16 @@ const blockUser = async (sock, msg, args, context) => {
     if (!isOwner(context.sender)) {
         return await sock.sendMessage(context.from, { 
             text: '❌ Only the bot owner can block users' 
-        });
+        }, { quoted: msg });
     }
     
     const quotedMsg = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
     const quotedSender = msg.message?.extendedTextMessage?.contextInfo?.participant;
     
-    if (!quotedMsg && !args[0]) {
+    if (!quotedSender && !args[0]) {
         return await sock.sendMessage(context.from, { 
             text: `❌ Reply to user's message or provide their number\n\nExample: ${context.prefix}block 2348012345678` 
-        });
+        }, { quoted: msg });
     }
     
     try {
@@ -56,23 +56,26 @@ const blockUser = async (sock, msg, args, context) => {
         }
         
         const userNumber = userToBlock.split('@')[0];
+        
         if (isOwner(userToBlock)) {
             return await sock.sendMessage(context.from, { 
                 text: '❌ You cannot block yourself' 
-            });
+            }, { quoted: msg });
         }
+
+        console.log(`[Block Command] Blocking user: ${userToBlock}`);
         
         await sock.updateBlockStatus(userToBlock, 'block');
         
         return await sock.sendMessage(context.from, { 
             text: `✅ User blocked successfully\n📱 Number: +${userNumber}` 
-        });
+        }, { quoted: msg });
         
     } catch (error) {
         console.error('Error in block command:', error.message);
         return await sock.sendMessage(context.from, { 
             text: `❌ Failed to block user: ${error.message}` 
-        });
+        }, { quoted: msg });
     }
 };
 
@@ -80,16 +83,16 @@ const unblockUser = async (sock, msg, args, context) => {
     if (!isOwner(context.sender)) {
         return await sock.sendMessage(context.from, { 
             text: '❌ Only the bot owner can unblock users' 
-        });
+        }, { quoted: msg });
     }
     
     const quotedMsg = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
     const quotedSender = msg.message?.extendedTextMessage?.contextInfo?.participant;
     
-    if (!quotedMsg && !args[0]) {
+    if (!quotedSender && !args[0]) {
         return await sock.sendMessage(context.from, { 
             text: `❌ Reply to user's message or provide their number\n\nExample: ${context.prefix}unblock 2348012345678` 
-        });
+        }, { quoted: msg });
     }
     
     try {
@@ -107,17 +110,19 @@ const unblockUser = async (sock, msg, args, context) => {
         
         const userNumber = userToUnblock.split('@')[0];
         
+        console.log(`[Unblock Command] Unblocking user: ${userToUnblock}`);
+        
         await sock.updateBlockStatus(userToUnblock, 'unblock');
         
         return await sock.sendMessage(context.from, { 
             text: `✅ User unblocked successfully\n📱 Number: +${userNumber}` 
-        });
+        }, { quoted: msg });
         
     } catch (error) {
         console.error('Error in unblock command:', error.message);
         return await sock.sendMessage(context.from, { 
             text: `❌ Failed to unblock user: ${error.message}` 
-        });
+        }, { quoted: msg });
     }
 };
 
