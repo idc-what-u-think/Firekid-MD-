@@ -86,6 +86,7 @@ const menu = async (sock, msg, args, context) => {
 │ • kill - Wasted effect
 │ • lyrics - Get song lyrics
 │ • weather - Weather info
+│ • guess - Guess the riddle
 │
 ╰━━━━━━━━━━━━━━━━━━━━╯
 ╭━━━『 *OWNER ONLY* 』━━━╮
