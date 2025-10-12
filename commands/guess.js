@@ -23,41 +23,46 @@ const normalizeNumber = (jidOrNum) => {
 };
 
 const categories = [
-    'famous person (actor, musician, politician, athlete, historical figure)',
-    'animal',
-    'country',
-    'movie',
-    'food or dish',
-    'brand or company',
-    'invention or technology',
-    'sport',
-    'instrument',
-    'language'
+    'very famous person (globally known actor, musician, politician, athlete, or historical figure)',
+    'common animal that everyone knows',
+    'popular country',
+    'blockbuster movie or very famous film',
+    'popular food or dish',
+    'well-known brand or company',
+    'famous invention or everyday technology',
+    'popular sport',
+    'common musical instrument'
 ];
 
 const generateRiddle = async () => {
     const category = categories[Math.floor(Math.random() * categories.length)];
     const apiKey = getApiKey();
     
-    const prompt = `Generate a mystery riddle for a guessing game. Pick a specific ${category}.
+    const prompt = `Generate a mystery riddle for a casual guessing game. Pick something SIMPLE, WELL-KNOWN, and FAMOUS from this category: ${category}.
 
-Format your response EXACTLY like this (no extra text):
-ANSWER: [the answer]
-HINT1: [A very vague, cryptic first hint]
-HINT2: [A slightly less vague hint]
-HINT3: [A medium difficulty hint]
-HINT4: [A clearer hint]
-HINT5: [An easier hint that gives more context]
+IMPORTANT RULES:
+- Pick something that 90% of people would recognize
+- NO obscure items, rare things, or niche knowledge
+- Pick globally famous things only
+- Make it challenging but FAIR
 
-Example for "Albert Einstein":
-ANSWER: Albert Einstein
-HINT1: Time bends to my theories, yet I never moved from thought
-HINT2: My equation changed the world, just three letters and a number
-HINT3: Wild hair, German roots, but America became my home
-HINT4: Nobel Prize winner who revolutionized physics in the 1900s
-HINT5: Famous physicist known for E=mc² and the theory of relativity
+Format your response EXACTLY like this:
+ANSWER: [the answer - must be something very famous and widely known]
+HINT1: [Very cryptic and vague first clue]
+HINT2: [Still mysterious but slightly more specific]
+HINT3: [Medium difficulty, gives more context]
+HINT4: [Clearer hint with more details]
+HINT5: [Very obvious hint that almost gives it away]
 
-Make it challenging but fair! Add more hints if needed to make it solvable.`;
+Example for "Michael Jackson":
+ANSWER: Michael Jackson
+HINT1: I moonwalked into history and changed music forever
+HINT2: The King of Pop, my glove sparkled under stage lights
+HINT3: Thriller, Billie Jean, Beat It - my songs topped every chart
+HINT4: American singer who died in 2009, sold over 400 million records
+HINT5: Known for the moonwalk dance, white glove, and the album Thriller
+
+Make it fun and accessible for everyone!`;
 
     try {
         const response = await axios.post(
@@ -75,24 +80,25 @@ Make it challenging but fair! Add more hints if needed to make it solvable.`;
         const text = response.data.candidates[0].content.parts[0].text;
         
         const answerMatch = text.match(/ANSWER:\s*(.+)/i);
-        const hints = [];
-        
-        for (let i = 1; i <= 10; i++) {
-            const hintMatch = text.match(new RegExp(`HINT${i}:\\s*(.+)`, 'i'));
-            if (hintMatch) {
-                hints.push(hintMatch[1].trim());
-            } else {
-                break;
-            }
-        }
+        const hint1Match = text.match(/HINT1:\s*(.+)/i);
+        const hint2Match = text.match(/HINT2:\s*(.+)/i);
+        const hint3Match = text.match(/HINT3:\s*(.+)/i);
+        const hint4Match = text.match(/HINT4:\s*(.+)/i);
+        const hint5Match = text.match(/HINT5:\s*(.+)/i);
 
-        if (!answerMatch || hints.length < 3) {
+        if (!answerMatch || !hint1Match || !hint2Match || !hint3Match || !hint4Match || !hint5Match) {
             throw new Error('Invalid response format');
         }
 
         return {
             answer: answerMatch[1].trim(),
-            hints: hints,
+            hints: [
+                hint1Match[1].trim(),
+                hint2Match[1].trim(),
+                hint3Match[1].trim(),
+                hint4Match[1].trim(),
+                hint5Match[1].trim()
+            ],
             category: category
         };
     } catch (error) {
@@ -120,9 +126,9 @@ const guessGame = async (sock, msg, args, context) => {
         players: [],
         phase: 'joining',
         currentPlayer: 0,
-        round: 1,
+        round: 0,
+        maxRounds: 5,
         riddle: null,
-        currentHintIndex: 0,
         timer: null,
         countdownTimer: null
     };
@@ -257,25 +263,27 @@ const nextTurn = async (sock, chatId) => {
     if (game.currentPlayer === 0) {
         game.round++;
         
-        if (game.currentHintIndex < game.riddle.hints.length - 1) {
-            game.currentHintIndex++;
-            
+        if (game.round > game.maxRounds) {
             await sock.sendMessage(chatId, { 
-                text: `🔄 *New Round ${game.round}*\n\n💡 *New Hint:*\n${game.riddle.hints[game.currentHintIndex]}\n\nLet's continue!` 
+                text: `🎮 *Game Over!*\n\n❌ Nobody guessed it after ${game.maxRounds} rounds!\n\nThe riddle was too hard! 😅\n\n✅ *The answer was:* ${game.riddle.answer}` 
             });
-            
-            await new Promise(resolve => setTimeout(resolve, 2000));
+            activeGames.delete(chatId);
+            return;
         }
+        
+        await sock.sendMessage(chatId, { 
+            text: `🔄 *Round ${game.round}/${game.maxRounds}*\n\n💡 *Hint ${game.round}:*\n${game.riddle.hints[game.round - 1]}` 
+        });
+        
+        await new Promise(resolve => setTimeout(resolve, 2000));
     }
     
     const currentPlayer = game.players[game.currentPlayer];
     const nextPlayerIndex = (game.currentPlayer + 1) % game.players.length;
     const nextPlayer = game.players[nextPlayerIndex];
     
-    const allHints = game.riddle.hints.slice(0, game.currentHintIndex + 1).map((h, i) => `💡 *Hint ${i + 1}:* ${h}`).join('\n\n');
-    
     await sock.sendMessage(chatId, { 
-        text: `🎯 *Round ${game.round}*\n\n${allHints}\n\n👤 ${currentPlayer.mention}'s turn!\n⏰ Time: 25s\n⏭️ Next: ${nextPlayer.mention}`,
+        text: `👤 ${currentPlayer.mention}'s turn!\n⏰ Time: 25s\n⏭️ Next: ${nextPlayer.mention}`,
         mentions: [currentPlayer.id, nextPlayer.id]
     });
     
@@ -329,7 +337,7 @@ const checkGuess = async (sock, msg, context) => {
         currentPlayer.score++;
         
         await sock.sendMessage(chatId, { 
-            text: `🎉 *CORRECT!*\n\n👑 ${currentPlayer.mention} guessed it!\n\n✅ *Answer:* ${game.riddle.answer}\n\n🔥 Congratulations! You're a genius! 🧠`,
+            text: `🎉 *CORRECT!*\n\n👑 ${currentPlayer.mention} guessed it in Round ${game.round}!\n\n✅ *Answer:* ${game.riddle.answer}\n\n🔥 Congratulations! 🧠`,
             mentions: [currentPlayer.id]
         });
         
