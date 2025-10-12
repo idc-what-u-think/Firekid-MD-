@@ -40,7 +40,17 @@ const update = async (sock, msg, args, context) => {
             }, { quoted: msg });
         }
 
-        global.commands = newCommands;
+        Object.keys(require.cache).forEach(key => {
+            if (key.includes('temp_commands')) {
+                delete require.cache[key];
+            }
+        });
+
+        if (global.commands) {
+            Object.assign(global.commands, newCommands);
+        } else {
+            global.commands = newCommands;
+        }
         
         const commandCount = Object.keys(newCommands).length;
         
