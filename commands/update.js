@@ -1,7 +1,7 @@
 const normalizeNumber = (jidOrNum) => {
-  if (!jidOrNum) return '';
-  const digits = jidOrNum.replace(/[^0-9]/g, '');
-  return digits.replace(/^0+/, '');
+    if (!jidOrNum) return '';
+    const digits = jidOrNum.replace(/[^0-9]/g, '');
+    return digits.replace(/^0+/, '');
 };
 
 const isOwner = (sender) => {
@@ -26,9 +26,9 @@ const update = async (sock, msg, args, context) => {
             text: '⏳ Updating commands from GitHub...'
         }, { quoted: msg });
 
-        const { loadCommandsFromGitHub } = require('./commandLoader');
+        const { reloadCommandsFromGitHub } = require('../utils/commandLoader');
         
-        const newCommands = await loadCommandsFromGitHub(
+        const newCommands = await reloadCommandsFromGitHub(
             process.env.GITHUB_TOKEN,
             'https://github.com/idc-what-u-think/Firekid-MD-.git'
         );
@@ -40,9 +40,9 @@ const update = async (sock, msg, args, context) => {
         }
 
         global.commands = newCommands;
-
+        
         const commandCount = Object.keys(newCommands).length;
-
+        
         return await sock.sendMessage(context.from, {
             text: `✅ Commands updated successfully!\n\n📦 Loaded ${commandCount} commands\n\n💾 Changes take effect immediately`
         }, { quoted: msg });
