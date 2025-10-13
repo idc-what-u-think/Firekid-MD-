@@ -22,9 +22,13 @@ const song = async (sock, msg, args, context) => {
     
     try {
         const input = args.join(' ');
-        let spotifyUrl = input;
+        let spotifyTrackId = null;
 
-        if (!input.includes('spotify.com')) {
+        if (input.includes('spotify.com/track/')) {
+            spotifyTrackId = input.split('spotify.com/track/')[1].split('?')[0];
+        } else if (input.includes('open.spotify.com')) {
+            spotifyTrackId = input.split('/track/')[1]?.split('?')[0];
+        } else {
             await sock.sendMessage(context.from, { 
                 text: '🔍 Searching Spotify...' 
             }, { quoted: msg });
@@ -59,7 +63,7 @@ const song = async (sock, msg, args, context) => {
 
         const downloadResponse = await axios.get('https://spotify-downloader9.p.rapidapi.com/downloadSong', {
             params: {
-                songId: spotifyUrl
+                songId: spotifyTrackId
             },
             headers: {
                 'x-rapidapi-key': apiKey,
