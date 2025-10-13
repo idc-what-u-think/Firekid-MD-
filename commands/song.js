@@ -1,4 +1,5 @@
 const axios = require('axios');
+const ytSearch = require('yt-search');
 
 const song = async (sock, msg, args, context) => {
     if (!args[0]) {
@@ -13,69 +14,81 @@ const song = async (sock, msg, args, context) => {
         }, { quoted: msg });
         
         const songInput = args.join(' ');
+        
+        const searchResults = await ytSearch(songInput + ' audio');
+        
+        if (!searchResults || !searchResults.videos || searchResults.videos.length === 0) {
+            return await sock.sendMessage(context.from, { 
+                text: '❌ Song not found. Please try a different search term.' 
+            }, { quoted: msg });
+        }
+        
+        const video = searchResults.videos[0];
+        const videoUrl = video.url;
+        const songTitle = video.title;
+        const artist = video.author.name;
+        const thumbnail = video.thumbnail;
+        const duration = video.timestamp;
+        
+        await sock.sendMessage(context.from, { 
+            text: `⏳ Downloading: ${songTitle}\n👤 By: ${artist}\n⏱️ Duration: ${duration}` 
+        }, { quoted: msg });
+        
         let downloadUrl = null;
-        let songTitle = '';
-        let videoId = '';
         
         try {
-            const searchResponse = await axios.get(`https://www.youtube.com/results?search_query=${encodeURIComponent(songInput + ' audio')}`, {
-                timeout: 15000
+            const response = await axios.get(`https://api.downloadmp3.app/api/convert`, {
+                params: {
+                    url: videoUrl,
+                    format: 'mp3'
+                },
+                timeout: 30000
             });
             
-            const videoIdMatch = searchResponse.data.match(/"videoId":"([^"]+)"/);
-            
-            if (!videoIdMatch) {
-                return await sock.sendMessage(context.from, { 
-                    text: '❌ Song not found. Please try a different search term.' 
-                }, { quoted: msg });
+            if (response.data && response.data.downloadUrl) {
+                downloadUrl = response.data.downloadUrl;
             }
-            
-            videoId = videoIdMatch[1];
-            const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
-            
-            await sock.sendMessage(context.from, { 
-                text: '⏳ Downloading song...' 
-            }, { quoted: msg });
+        } catch (error1) {
+            console.log('DownloadMP3 failed, trying alternative...');
             
             try {
-                const downloadResponse = await axios.get(`https://api.cobalt.tools/api/json`, {
-                    method: 'POST',
-                    headers: {
-                        'Accept': 'application/json',
-                        'Content-Type': 'application/json'
-                    },
-                    data: {
-                        url: videoUrl,
-                        isAudioOnly: true,
-                        aFormat: 'mp3'
-                    },
+                const videoId = videoUrl.split('v=')[1]?.split('&')[0];
+                
+                const response2 = await axios.post('https://mp3-download.to/api/ajax/search', {
+                    query: videoUrl,
+                    vt: 'mp3'
+                }, {
                     timeout: 30000
                 });
                 
-                if (downloadResponse.data && downloadResponse.data.url) {
-                    downloadUrl = downloadResponse.data.url;
+                if (response2.data && response2.data.url) {
+                    downloadUrl = response2.data.url;
                 }
-            } catch (error1) {
-                console.log('Cobalt API failed, trying Y2Mate...');
+            } catch (error2) {
+                console.log('MP3Download.to failed, trying tomp3.cc...');
                 
                 try {
-                    const y2mateResponse = await axios.post('https://www.y2mate.com/mates/analyzeV2/ajax', 
-                        `k_query=${encodeURIComponent(videoUrl)}&k_page=home&hl=en&q_auto=0`,
+                    const response3 = await axios.post('https://tomp3.cc/api/ajax/search', 
+                        new URLSearchParams({
+                            query: videoUrl,
+                            vt: 'mp3'
+                        }),
                         {
                             headers: {
-                                'Content-Type': 'application/x-www-form-urlencoded',
-                                'User-Agent': 'Mozilla/5.0'
+                                'Content-Type': 'application/x-www-form-urlencoded'
                             },
                             timeout: 30000
                         }
                     );
                     
-                    if (y2mateResponse.data && y2mateResponse.data.links && y2mateResponse.data.links.mp3) {
-                        const audioKey = Object.keys(y2mateResponse.data.links.mp3)[0];
-                        const kValue = y2mateResponse.data.links.mp3[audioKey].k;
+                    if (response3.data && response3.data.links && response3.data.links.mp3) {
+                        const mp3Key = Object.keys(response3.data.links.mp3)[0];
                         
-                        const convertResponse = await axios.post('https://www.y2mate.com/mates/convertV2/index',
-                            `vid=${videoId}&k=${kValue}`,
+                        const convertResponse = await axios.post('https://tomp3.cc/api/ajax/convert',
+                            new URLSearchParams({
+                                vid: response3.data.vid,
+                                k: response3.data.links.mp3[mp3Key].k
+                            }),
                             {
                                 headers: {
                                     'Content-Type': 'application/x-www-form-urlencoded'
@@ -88,60 +101,31 @@ const song = async (sock, msg, args, context) => {
                             downloadUrl = convertResponse.data.dlink;
                         }
                     }
-                } catch (error2) {
-                    console.log('Y2Mate failed, trying SaveFrom...');
-                    
-                    try {
-                        const saveFromResponse = await axios.get(`https://yt1s.com/api/ajaxSearch/index`, {
-                            params: {
-                                q: videoUrl,
-                                vt: 'mp3'
-                            },
-                            timeout: 30000
-                        });
-                        
-                        if (saveFromResponse.data && saveFromResponse.data.links && saveFromResponse.data.links.mp3) {
-                            const mp3Links = saveFromResponse.data.links.mp3;
-                            const bestQuality = Object.keys(mp3Links).find(key => mp3Links[key].q === '128kbps');
-                            
-                            if (bestQuality) {
-                                const convertKey = mp3Links[bestQuality].k;
-                                
-                                const finalResponse = await axios.get(`https://yt1s.com/api/ajaxConvert/convert`, {
-                                    params: {
-                                        vid: videoId,
-                                        k: convertKey
-                                    },
-                                    timeout: 30000
-                                });
-                                
-                                if (finalResponse.data && finalResponse.data.dlink) {
-                                    downloadUrl = finalResponse.data.dlink;
-                                }
-                            }
-                        }
-                    } catch (error3) {
-                        throw new Error('All download APIs failed');
-                    }
+                } catch (error3) {
+                    throw new Error('All download methods failed');
                 }
             }
-            
-            songTitle = songInput;
-            
-        } catch (error) {
-            throw error;
         }
         
         if (!downloadUrl) {
             return await sock.sendMessage(context.from, { 
-                text: '❌ Failed to get download link. Please try again later.' 
+                text: `❌ Failed to download. Here's the YouTube link instead:\n${videoUrl}` 
             }, { quoted: msg });
         }
 
         await sock.sendMessage(context.from, {
             audio: { url: downloadUrl },
             mimetype: 'audio/mpeg',
-            fileName: `${songTitle}.mp3`
+            fileName: `${songTitle}.mp3`,
+            contextInfo: {
+                externalAdReply: {
+                    title: songTitle,
+                    body: `${artist} • ${duration}`,
+                    thumbnailUrl: thumbnail,
+                    mediaType: 2,
+                    mediaUrl: videoUrl
+                }
+            }
         }, { quoted: msg });
         
     } catch (error) {
