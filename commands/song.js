@@ -1,9 +1,8 @@
 const axios = require('axios');
 
 const SPOTIFY_KEYS = [
-    'cc55783228msh1f7f79520170cecp1273ecjsn871a52b845c7',
-    '926738c8e1mshefb92a5bc1fe6a0p1a55a3jsn1830795de8b5',
-    '3a4532559dmsh2d32efab5354e28p16c43djsn2d47c231e588'
+    '21713c9b31msh4812fb7a7b6ea42p17ebfajsn789ce0fb9cef',
+    'da029cc853mshe5096f12a6929abp15279cjsne19de2899b9f'
 ];
 
 let keyIndex = 0;
@@ -71,16 +70,14 @@ const song = async (sock, msg, args, context) => {
 
         let downloadUrl = null;
 
-        if (downloadResponse.data && downloadResponse.data.link) {
+        if (downloadResponse.data && downloadResponse.data.data && downloadResponse.data.data.downloadLink) {
+            downloadUrl = downloadResponse.data.data.downloadLink;
+        } else if (downloadResponse.data && downloadResponse.data.link) {
             downloadUrl = downloadResponse.data.link;
         } else if (downloadResponse.data && downloadResponse.data.url) {
             downloadUrl = downloadResponse.data.url;
         } else if (downloadResponse.data && downloadResponse.data.downloadUrl) {
             downloadUrl = downloadResponse.data.downloadUrl;
-        } else if (downloadResponse.data && downloadResponse.data.data && downloadResponse.data.data.link) {
-            downloadUrl = downloadResponse.data.data.link;
-        } else if (downloadResponse.data && downloadResponse.data.data && downloadResponse.data.data.url) {
-            downloadUrl = downloadResponse.data.data.url;
         }
 
         if (!downloadUrl) {
@@ -90,7 +87,7 @@ const song = async (sock, msg, args, context) => {
             const trackArtist = downloadResponse.data.data?.artist || 'Unknown';
             
             return await sock.sendMessage(context.from, { 
-                text: `ℹ️ Song found: ${trackTitle}\n👤 By: ${trackArtist}\n\n❌ Download not available through this API.\n\nTry:\n• Using a Spotify link directly\n• Searching on other music platforms` 
+                text: `ℹ️ Song found: ${trackTitle}\n👤 By: ${trackArtist}\n\n❌ Download not available.` 
             }, { quoted: msg });
         }
 
