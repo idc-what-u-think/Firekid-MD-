@@ -1,97 +1,5 @@
 const axios = require('axios');
 
-const spotifyApis = [
-    {
-        host: 'spotify-downloader9.p.rapidapi.com',
-        key: 'cc55783228msh1f7f79520170cecp1273ecjsn871a52b845c7'
-    },
-    {
-        host: 'spotify-downloader9.p.rapidapi.com',
-        key: '3a4532559dmsh2d32efab5354e28p16c43djsn2d47c231e588'
-    },
-    {
-        host: 'spotify-downloader9.p.rapidapi.com',
-        key: '926738c8e1mshefb92a5bc1fe6a0p1a55a3jsn1830795de8b5'
-    }
-];
-
-let currentApiIndex = 0;
-
-const getNextApi = () => {
-    const api = spotifyApis[currentApiIndex];
-    currentApiIndex = (currentApiIndex + 1) % spotifyApis.length;
-    return api;
-};
-
-const searchSpotify = async (songName) => {
-    const api = getNextApi();
-    
-    try {
-        const response = await axios.get(
-            `https://${api.host}/search`,
-            {
-                params: { q: songName },
-                headers: {
-                    'x-rapidapi-key': api.key,
-                    'x-rapidapi-host': api.host
-                },
-                timeout: 10000
-            }
-        );
-
-        if (response.data && response.data.tracks && response.data.tracks.length > 0) {
-            return response.data.tracks[0];
-        }
-
-        return null;
-    } catch (error) {
-        console.error('Search error:', error.message);
-        return null;
-    }
-};
-
-const downloadSong = async (spotifyUrl) => {
-    const api = getNextApi();
-    
-    try {
-        const options = {
-            method: 'GET',
-            url: `https://${api.host}/downloadSong`,
-            params: {
-                songId: spotifyUrl
-            },
-            headers: {
-                'x-rapidapi-key': api.key,
-                'x-rapidapi-host': api.host
-            },
-            timeout: 15000
-        };
-
-        const response = await axios.request(options);
-
-        if (response.data && response.data.link) {
-            return response.data.link;
-        }
-
-        if (response.data && response.data.url) {
-            return response.data.url;
-        }
-
-        if (response.data && response.data.downloadUrl) {
-            return response.data.downloadUrl;
-        }
-
-        if (response.data && typeof response.data === 'string' && response.data.startsWith('http')) {
-            return response.data;
-        }
-
-        return null;
-    } catch (error) {
-        console.error('Download error:', error.message);
-        return null;
-    }
-};
-
 const song = async (sock, msg, args, context) => {
     if (!args[0]) {
         return await sock.sendMessage(context.from, { 
@@ -105,77 +13,125 @@ const song = async (sock, msg, args, context) => {
         }, { quoted: msg });
         
         const songInput = args.join(' ');
-        let downloadLink = null;
+        let downloadUrl = null;
         let songTitle = '';
         let songArtist = '';
+        let thumbnail = '';
         
         const isSpotifyUrl = songInput.includes('spotify.com');
         
         if (isSpotifyUrl) {
-            downloadLink = await downloadSong(songInput);
-            if (!downloadLink) {
-                return await sock.sendMessage(context.from, { 
-                    text: '❌ Failed to download from Spotify URL. Please try again.' 
-                }, { quoted: msg });
+            try {
+                const response = await axios.get(`https://api.fabdl.com/spotify/get?url=${encodeURIComponent(songInput)}`, {
+                    timeout: 30000
+                });
+                
+                if (response.data && response.data.result) {
+                    downloadUrl = response.data.result.download_url;
+                    songTitle = response.data.result.name || 'Unknown Title';
+                    songArtist = response.data.result.artists || 'Unknown Artist';
+                    thumbnail = response.data.result.image;
+                }
+            } catch (error) {
+                console.log('FabDL failed, trying alternative...');
+                
+                try {
+                    const response2 = await axios.get(`https://api.spotifydown.com/download/${songInput.split('/track/')[1]?.split('?')[0]}`, {
+                        timeout: 30000
+                    });
+                    
+                    if (response2.data && response2.data.link) {
+                        downloadUrl = response2.data.link;
+                        songTitle = response2.data.metadata?.title || 'Unknown Title';
+                        songArtist = response2.data.metadata?.artists || 'Unknown Artist';
+                        thumbnail = response2.data.metadata?.cover;
+                    }
+                } catch (error2) {
+                    throw new Error('Failed to download from Spotify URL');
+                }
             }
-            songTitle = 'Spotify Track';
-            songArtist = 'Unknown Artist';
         } else {
-            const songData = await searchSpotify(songInput);
-            
-            if (!songData) {
-                return await sock.sendMessage(context.from, { 
-                    text: '❌ Song not found. Please try a different search term.' 
+            try {
+                const searchResponse = await axios.get(`https://api.fabdl.com/spotify/search?q=${encodeURIComponent(songInput)}`, {
+                    timeout: 30000
+                });
+                
+                if (!searchResponse.data || !searchResponse.data.result || searchResponse.data.result.length === 0) {
+                    return await sock.sendMessage(context.from, { 
+                        text: '❌ Song not found. Please try a different search term.' 
+                    }, { quoted: msg });
+                }
+                
+                const firstResult = searchResponse.data.result[0];
+                songTitle = firstResult.name || 'Unknown Title';
+                songArtist = firstResult.artists || 'Unknown Artist';
+                thumbnail = firstResult.image;
+                
+                await sock.sendMessage(context.from, { 
+                    text: `⏳ Downloading: ${songTitle} by ${songArtist}...` 
                 }, { quoted: msg });
+                
+                const downloadResponse = await axios.get(`https://api.fabdl.com/spotify/get?url=${encodeURIComponent(firstResult.id)}`, {
+                    timeout: 30000
+                });
+                
+                if (downloadResponse.data && downloadResponse.data.result) {
+                    downloadUrl = downloadResponse.data.result.download_url;
+                }
+            } catch (error) {
+                console.log('FabDL search failed, trying YouTube alternative...');
+                
+                try {
+                    const ytSearchResponse = await axios.get(`https://api.popcat.xyz/spotify?q=${encodeURIComponent(songInput)}`, {
+                        timeout: 30000
+                    });
+                    
+                    if (ytSearchResponse.data && ytSearchResponse.data[0]) {
+                        const track = ytSearchResponse.data[0];
+                        songTitle = track.title;
+                        songArtist = track.artist;
+                        thumbnail = track.image;
+                        
+                        const ytDownload = await axios.get(`https://api.popcat.xyz/youtube/download?url=${encodeURIComponent(`https://www.youtube.com/watch?v=${track.id}`)}`, {
+                            timeout: 30000
+                        });
+                        
+                        if (ytDownload.data && ytDownload.data.url) {
+                            downloadUrl = ytDownload.data.url;
+                        }
+                    }
+                } catch (error2) {
+                    throw new Error('All search methods failed');
+                }
             }
-
-            if (!songData.link) {
-                return await sock.sendMessage(context.from, { 
-                    text: '❌ Invalid song data received. Please try again.' 
-                }, { quoted: msg });
-            }
-
-            await sock.sendMessage(context.from, { 
-                text: '⏳ Downloading song...' 
+        }
+        
+        if (!downloadUrl) {
+            return await sock.sendMessage(context.from, { 
+                text: '❌ Failed to get download link. Please try again later.' 
             }, { quoted: msg });
-
-            downloadLink = await downloadSong(songData.link);
-            
-            if (!downloadLink) {
-                return await sock.sendMessage(context.from, { 
-                    text: '❌ Failed to get song download link. Please try again.' 
-                }, { quoted: msg });
-            }
-            
-            songTitle = songData.title || 'Unknown Title';
-            songArtist = songData.artist || 'Unknown Artist';
         }
 
-        const audioMessage = {
-            audio: { url: downloadLink },
+        await sock.sendMessage(context.from, {
+            audio: { url: downloadUrl },
             mimetype: 'audio/mpeg',
-            fileName: `${songTitle}.mp3`
-        };
-
-        await sock.sendMessage(context.from, audioMessage, { quoted: msg });
+            fileName: `${songTitle}.mp3`,
+            contextInfo: thumbnail ? {
+                externalAdReply: {
+                    title: songTitle,
+                    body: songArtist,
+                    thumbnailUrl: thumbnail,
+                    mediaType: 2,
+                    mediaUrl: downloadUrl
+                }
+            } : undefined
+        }, { quoted: msg });
         
     } catch (error) {
         console.error('Error in song command:', error.message);
         
-        if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
-            return await sock.sendMessage(context.from, { 
-                text: '❌ Request timed out. Please try again.' 
-            }, { quoted: msg });
-        }
-        
-        if (error.response) {
-            return await sock.sendMessage(context.from, { 
-                text: `❌ API error: ${error.response.status}. Please try again later.` 
-            }, { quoted: msg });
-        }
-        
         return await sock.sendMessage(context.from, { 
-            text: '❌ Failed to download song. Please try again later.' 
+            text: '❌ Failed to download song. Please try again later or check if the link is valid.' 
         }, { quoted: msg });
     }
 };
