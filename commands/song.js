@@ -3,7 +3,7 @@ const axios = require('axios');
 const song = async (sock, msg, args, context) => {
     if (!args[0]) {
         return await sock.sendMessage(context.from, { 
-            text: `❌ Please provide a song name or Spotify URL\n\nExamples:\n${context.prefix}song Shape of You\n${context.prefix}song https://open.spotify.com/track/...` 
+            text: `❌ Please provide a song name\n\nExample:\n${context.prefix}song Shape of You` 
         }, { quoted: msg });
     }
     
@@ -15,95 +15,121 @@ const song = async (sock, msg, args, context) => {
         const songInput = args.join(' ');
         let downloadUrl = null;
         let songTitle = '';
-        let songArtist = '';
-        let thumbnail = '';
+        let videoId = '';
         
-        const isSpotifyUrl = songInput.includes('spotify.com');
-        
-        if (isSpotifyUrl) {
-            try {
-                const response = await axios.get(`https://api.fabdl.com/spotify/get?url=${encodeURIComponent(songInput)}`, {
-                    timeout: 30000
-                });
-                
-                if (response.data && response.data.result) {
-                    downloadUrl = response.data.result.download_url;
-                    songTitle = response.data.result.name || 'Unknown Title';
-                    songArtist = response.data.result.artists || 'Unknown Artist';
-                    thumbnail = response.data.result.image;
-                }
-            } catch (error) {
-                console.log('FabDL failed, trying alternative...');
-                
-                try {
-                    const response2 = await axios.get(`https://api.spotifydown.com/download/${songInput.split('/track/')[1]?.split('?')[0]}`, {
-                        timeout: 30000
-                    });
-                    
-                    if (response2.data && response2.data.link) {
-                        downloadUrl = response2.data.link;
-                        songTitle = response2.data.metadata?.title || 'Unknown Title';
-                        songArtist = response2.data.metadata?.artists || 'Unknown Artist';
-                        thumbnail = response2.data.metadata?.cover;
-                    }
-                } catch (error2) {
-                    throw new Error('Failed to download from Spotify URL');
-                }
-            }
-        } else {
-            try {
-                const searchResponse = await axios.get(`https://api.fabdl.com/spotify/search?q=${encodeURIComponent(songInput)}`, {
-                    timeout: 30000
-                });
-                
-                if (!searchResponse.data || !searchResponse.data.result || searchResponse.data.result.length === 0) {
-                    return await sock.sendMessage(context.from, { 
-                        text: '❌ Song not found. Please try a different search term.' 
-                    }, { quoted: msg });
-                }
-                
-                const firstResult = searchResponse.data.result[0];
-                songTitle = firstResult.name || 'Unknown Title';
-                songArtist = firstResult.artists || 'Unknown Artist';
-                thumbnail = firstResult.image;
-                
-                await sock.sendMessage(context.from, { 
-                    text: `⏳ Downloading: ${songTitle} by ${songArtist}...` 
+        try {
+            const searchResponse = await axios.get(`https://www.youtube.com/results?search_query=${encodeURIComponent(songInput + ' audio')}`, {
+                timeout: 15000
+            });
+            
+            const videoIdMatch = searchResponse.data.match(/"videoId":"([^"]+)"/);
+            
+            if (!videoIdMatch) {
+                return await sock.sendMessage(context.from, { 
+                    text: '❌ Song not found. Please try a different search term.' 
                 }, { quoted: msg });
-                
-                const downloadResponse = await axios.get(`https://api.fabdl.com/spotify/get?url=${encodeURIComponent(firstResult.id)}`, {
+            }
+            
+            videoId = videoIdMatch[1];
+            const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
+            
+            await sock.sendMessage(context.from, { 
+                text: '⏳ Downloading song...' 
+            }, { quoted: msg });
+            
+            try {
+                const downloadResponse = await axios.get(`https://api.cobalt.tools/api/json`, {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json'
+                    },
+                    data: {
+                        url: videoUrl,
+                        isAudioOnly: true,
+                        aFormat: 'mp3'
+                    },
                     timeout: 30000
                 });
                 
-                if (downloadResponse.data && downloadResponse.data.result) {
-                    downloadUrl = downloadResponse.data.result.download_url;
+                if (downloadResponse.data && downloadResponse.data.url) {
+                    downloadUrl = downloadResponse.data.url;
                 }
-            } catch (error) {
-                console.log('FabDL search failed, trying YouTube alternative...');
+            } catch (error1) {
+                console.log('Cobalt API failed, trying Y2Mate...');
                 
                 try {
-                    const ytSearchResponse = await axios.get(`https://api.popcat.xyz/spotify?q=${encodeURIComponent(songInput)}`, {
-                        timeout: 30000
-                    });
-                    
-                    if (ytSearchResponse.data && ytSearchResponse.data[0]) {
-                        const track = ytSearchResponse.data[0];
-                        songTitle = track.title;
-                        songArtist = track.artist;
-                        thumbnail = track.image;
-                        
-                        const ytDownload = await axios.get(`https://api.popcat.xyz/youtube/download?url=${encodeURIComponent(`https://www.youtube.com/watch?v=${track.id}`)}`, {
+                    const y2mateResponse = await axios.post('https://www.y2mate.com/mates/analyzeV2/ajax', 
+                        `k_query=${encodeURIComponent(videoUrl)}&k_page=home&hl=en&q_auto=0`,
+                        {
+                            headers: {
+                                'Content-Type': 'application/x-www-form-urlencoded',
+                                'User-Agent': 'Mozilla/5.0'
+                            },
                             timeout: 30000
-                        });
+                        }
+                    );
+                    
+                    if (y2mateResponse.data && y2mateResponse.data.links && y2mateResponse.data.links.mp3) {
+                        const audioKey = Object.keys(y2mateResponse.data.links.mp3)[0];
+                        const kValue = y2mateResponse.data.links.mp3[audioKey].k;
                         
-                        if (ytDownload.data && ytDownload.data.url) {
-                            downloadUrl = ytDownload.data.url;
+                        const convertResponse = await axios.post('https://www.y2mate.com/mates/convertV2/index',
+                            `vid=${videoId}&k=${kValue}`,
+                            {
+                                headers: {
+                                    'Content-Type': 'application/x-www-form-urlencoded'
+                                },
+                                timeout: 30000
+                            }
+                        );
+                        
+                        if (convertResponse.data && convertResponse.data.dlink) {
+                            downloadUrl = convertResponse.data.dlink;
                         }
                     }
                 } catch (error2) {
-                    throw new Error('All search methods failed');
+                    console.log('Y2Mate failed, trying SaveFrom...');
+                    
+                    try {
+                        const saveFromResponse = await axios.get(`https://yt1s.com/api/ajaxSearch/index`, {
+                            params: {
+                                q: videoUrl,
+                                vt: 'mp3'
+                            },
+                            timeout: 30000
+                        });
+                        
+                        if (saveFromResponse.data && saveFromResponse.data.links && saveFromResponse.data.links.mp3) {
+                            const mp3Links = saveFromResponse.data.links.mp3;
+                            const bestQuality = Object.keys(mp3Links).find(key => mp3Links[key].q === '128kbps');
+                            
+                            if (bestQuality) {
+                                const convertKey = mp3Links[bestQuality].k;
+                                
+                                const finalResponse = await axios.get(`https://yt1s.com/api/ajaxConvert/convert`, {
+                                    params: {
+                                        vid: videoId,
+                                        k: convertKey
+                                    },
+                                    timeout: 30000
+                                });
+                                
+                                if (finalResponse.data && finalResponse.data.dlink) {
+                                    downloadUrl = finalResponse.data.dlink;
+                                }
+                            }
+                        }
+                    } catch (error3) {
+                        throw new Error('All download APIs failed');
+                    }
                 }
             }
+            
+            songTitle = songInput;
+            
+        } catch (error) {
+            throw error;
         }
         
         if (!downloadUrl) {
@@ -115,23 +141,14 @@ const song = async (sock, msg, args, context) => {
         await sock.sendMessage(context.from, {
             audio: { url: downloadUrl },
             mimetype: 'audio/mpeg',
-            fileName: `${songTitle}.mp3`,
-            contextInfo: thumbnail ? {
-                externalAdReply: {
-                    title: songTitle,
-                    body: songArtist,
-                    thumbnailUrl: thumbnail,
-                    mediaType: 2,
-                    mediaUrl: downloadUrl
-                }
-            } : undefined
+            fileName: `${songTitle}.mp3`
         }, { quoted: msg });
         
     } catch (error) {
         console.error('Error in song command:', error.message);
         
         return await sock.sendMessage(context.from, { 
-            text: '❌ Failed to download song. Please try again later or check if the link is valid.' 
+            text: '❌ Failed to download song. Please try again later.' 
         }, { quoted: msg });
     }
 };
