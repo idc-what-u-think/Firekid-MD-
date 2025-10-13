@@ -13,20 +13,64 @@ const ttdownload = async (sock, msg, args, context) => {
         }, { quoted: msg });
 
         const url = args[0];
-        
-        const response = await axios.get(`https://api.tiklydown.eu.org/api/download?url=${encodeURIComponent(url)}`, {
-            timeout: 30000
-        });
+        let videoUrl = null;
+        let title = 'TikTok Video';
+        let author = 'Unknown';
 
-        if (!response.data || !response.data.video || !response.data.video.noWatermark) {
+        try {
+            const response = await axios.post('https://www.tikwm.com/api/', 
+                `url=${encodeURIComponent(url)}&hd=1`,
+                {
+                    headers: { 
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'User-Agent': 'Mozilla/5.0'
+                    },
+                    timeout: 30000
+                }
+            );
+
+            if (response.data && response.data.code === 0 && response.data.data) {
+                videoUrl = response.data.data.hdplay || response.data.data.play;
+                title = response.data.data.title || title;
+                author = response.data.data.author?.unique_id || response.data.data.author?.nickname || author;
+            }
+        } catch (error1) {
+            console.log('TikWM API failed, trying alternative...');
+            
+            try {
+                const response2 = await axios.get(`https://api.tiklydown.eu.org/api/download/v3?url=${encodeURIComponent(url)}`, {
+                    timeout: 30000
+                });
+
+                if (response2.data && response2.data.result && response2.data.result.video) {
+                    videoUrl = response2.data.result.video;
+                    title = response2.data.result.desc || title;
+                    author = response2.data.result.author?.nickname || author;
+                }
+            } catch (error2) {
+                console.log('Tiklydown API failed, trying alternative...');
+                
+                try {
+                    const response3 = await axios.get(`https://api.ssstik.io/api/tiktok?url=${encodeURIComponent(url)}`, {
+                        timeout: 30000
+                    });
+
+                    if (response3.data && response3.data.video_url) {
+                        videoUrl = response3.data.video_url;
+                        title = response3.data.title || title;
+                        author = response3.data.author || author;
+                    }
+                } catch (error3) {
+                    throw new Error('All APIs failed');
+                }
+            }
+        }
+
+        if (!videoUrl) {
             return await sock.sendMessage(context.from, { 
                 text: '❌ Could not retrieve video. The link may be invalid or private.' 
             }, { quoted: msg });
         }
-
-        const videoUrl = response.data.video.noWatermark;
-        const title = response.data.title || 'TikTok Video';
-        const author = response.data.author?.nickname || 'Unknown';
 
         await sock.sendMessage(context.from, {
             video: { url: videoUrl },
@@ -37,20 +81,8 @@ const ttdownload = async (sock, msg, args, context) => {
     } catch (error) {
         console.error('Error in ttdownload command:', error.message);
         
-        let errorMessage = '❌ Failed to download TikTok video';
-        
-        if (error.response) {
-            if (error.response.status === 404) {
-                errorMessage = '❌ Video not found. The link may be invalid or private.';
-            } else if (error.response.status === 500) {
-                errorMessage = '❌ Server error. Please try again later.';
-            }
-        } else if (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT') {
-            errorMessage = '❌ Request timed out. Please try again.';
-        }
-        
         return await sock.sendMessage(context.from, { 
-            text: errorMessage 
+            text: '❌ Failed to download TikTok video. Please try again later or check if the link is valid.' 
         }, { quoted: msg });
     }
 };
