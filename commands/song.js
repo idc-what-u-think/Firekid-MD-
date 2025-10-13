@@ -1,9 +1,4 @@
 const axios = require('axios');
-const ytSearch = require('yt-search');
-const { YTMusic } = require('ytmusic-api');
-
-const ytmusic = new YTMusic();
-let ytmusicInitialized = false;
 
 const RAPIDAPI_KEYS = [
     '926738c8e1mshefb92a5bc1fe6a0p1a55a3jsn1830795de8b5',
@@ -22,140 +17,83 @@ const getNextKey = () => {
 const song = async (sock, msg, args, context) => {
     if (!args[0]) {
         return await sock.sendMessage(context.from, { 
-            text: `❌ Please provide a song name\n\nExample:\n${context.prefix}song Shape of You` 
+            text: `❌ Please provide a song name or Spotify URL\n\nExamples:\n${context.prefix}song Shape of You\n${context.prefix}song https://open.spotify.com/track/...` 
         }, { quoted: msg });
     }
     
     try {
+        const songInput = args.join(' ');
+        
         await sock.sendMessage(context.from, { 
             text: '⏳ Searching for song...' 
         }, { quoted: msg });
+
+        const apiKey = getNextKey();
         
-        const songInput = args.join(' ');
+        const searchResponse = await axios.get('https://yt-api.com/en/api/search/music', {
+            params: {
+                query: songInput
+            },
+            timeout: 15000
+        });
+        
+        if (!searchResponse.data || !searchResponse.data.result || searchResponse.data.result.length === 0) {
+            return await sock.sendMessage(context.from, { 
+                text: `❌ No songs found for "${songInput}"` 
+            }, { quoted: msg });
+        }
+
+        const track = searchResponse.data.result[0];
+        const videoId = track.id;
+        const songTitle = track.title || 'Unknown Song';
+        const artist = track.artist || 'Unknown Artist';
+        const thumbnail = track.image || '';
+
+        await sock.sendMessage(context.from, { 
+            text: `⏳ Downloading: ${songTitle}\n👤 By: ${artist}` 
+        }, { quoted: msg });
+
         let downloadUrl = null;
-        let songTitle = '';
-        let artist = '';
-        let thumbnail = '';
-        let videoId = '';
-        
-        if (!ytmusicInitialized) {
-            await ytmusic.initialize();
-            ytmusicInitialized = true;
-        }
-        
+
         try {
-            const ytmusicResults = await ytmusic.searchSongs(songInput);
-            
-            if (ytmusicResults && ytmusicResults.length > 0) {
-                const track = ytmusicResults[0];
-                videoId = track.videoId;
-                songTitle = track.name;
-                artist = track.artist?.name || 'Unknown Artist';
-                thumbnail = track.thumbnails?.[0]?.url || '';
-                
-                await sock.sendMessage(context.from, { 
-                    text: `⏳ Downloading: ${songTitle}\n👤 By: ${artist}` 
-                }, { quoted: msg });
-                
-                const apiKey = getNextKey();
-                
-                try {
-                    const rapidResponse = await axios.get('https://yt-search-and-download-mp3.p.rapidapi.com/mp3', {
-                        params: { id: videoId },
-                        headers: {
-                            'x-rapidapi-key': apiKey,
-                            'x-rapidapi-host': 'yt-search-and-download-mp3.p.rapidapi.com'
-                        },
-                        timeout: 30000
-                    });
-                    
-                    if (rapidResponse.data && rapidResponse.data.downloadUrl) {
-                        downloadUrl = rapidResponse.data.downloadUrl;
-                    } else if (rapidResponse.data && rapidResponse.data.link) {
-                        downloadUrl = rapidResponse.data.link;
-                    }
-                } catch (rapidError) {
-                    console.log('RapidAPI failed, trying alternatives...');
-                }
+            const downloadResponse = await axios.get('https://yt-api.com/en/api/getmusic', {
+                params: {
+                    videoId: videoId
+                },
+                timeout: 30000
+            });
+
+            if (downloadResponse.data && downloadResponse.data.link) {
+                downloadUrl = downloadResponse.data.link;
             }
-        } catch (ytmusicError) {
-            console.log('YTMusic failed, falling back to yt-search...');
+        } catch (downloadError) {
+            console.log('Primary download API failed, trying alternative...');
         }
-        
+
         if (!downloadUrl) {
             try {
-                const searchResults = await ytSearch(songInput + ' audio');
-                
-                if (searchResults && searchResults.videos && searchResults.videos.length > 0) {
-                    const video = searchResults.videos[0];
-                    videoId = video.videoId;
-                    songTitle = video.title;
-                    artist = video.author.name;
-                    thumbnail = video.thumbnail;
-                    
-                    await sock.sendMessage(context.from, { 
-                        text: `⏳ Downloading: ${songTitle}\n👤 By: ${artist}` 
-                    }, { quoted: msg });
-                    
-                    const apiKey = getNextKey();
-                    
-                    const rapidResponse = await axios.get('https://yt-search-and-download-mp3.p.rapidapi.com/mp3', {
-                        params: { id: videoId },
-                        headers: {
-                            'x-rapidapi-key': apiKey,
-                            'x-rapidapi-host': 'yt-search-and-download-mp3.p.rapidapi.com'
-                        },
-                        timeout: 30000
-                    });
-                    
-                    if (rapidResponse.data && rapidResponse.data.downloadUrl) {
-                        downloadUrl = rapidResponse.data.downloadUrl;
-                    } else if (rapidResponse.data && rapidResponse.data.link) {
-                        downloadUrl = rapidResponse.data.link;
-                    }
-                }
-            } catch (ytSearchError) {
-                console.log('YT-Search also failed, trying SoundCloud...');
-            }
-        }
-        
-        if (!downloadUrl) {
-            try {
-                const scResponse = await axios.get(`https://api-v2.soundcloud.com/search`, {
-                    params: {
-                        q: songInput,
-                        client_id: 'a3e059563d7fd3372b49b37f00a00bcf',
-                        limit: 1
+                const altResponse = await axios.get('https://yt-search-and-download-mp3.p.rapidapi.com/mp3', {
+                    params: { id: videoId },
+                    headers: {
+                        'x-rapidapi-key': apiKey,
+                        'x-rapidapi-host': 'yt-search-and-download-mp3.p.rapidapi.com'
                     },
                     timeout: 30000
                 });
-                
-                if (scResponse.data && scResponse.data.collection && scResponse.data.collection.length > 0) {
-                    const track = scResponse.data.collection[0];
-                    
-                    if (track.kind === 'track') {
-                        songTitle = track.title;
-                        artist = track.user.username;
-                        thumbnail = track.artwork_url;
-                        
-                        const scDownload = await axios.get(`https://api.soundcloudmp3.org/track`, {
-                            params: { url: track.permalink_url },
-                            timeout: 30000
-                        });
-                        
-                        if (scDownload.data && scDownload.data.url) {
-                            downloadUrl = scDownload.data.url;
-                        }
-                    }
+
+                if (altResponse.data && altResponse.data.downloadUrl) {
+                    downloadUrl = altResponse.data.downloadUrl;
+                } else if (altResponse.data && altResponse.data.link) {
+                    downloadUrl = altResponse.data.link;
                 }
-            } catch (scError) {
-                console.log('SoundCloud also failed');
+            } catch (altError) {
+                console.log('Alternative download API also failed');
             }
         }
-        
+
         if (!downloadUrl) {
             return await sock.sendMessage(context.from, { 
-                text: `❌ Failed to download song. Try again later or search on YouTube:\n\n🎵 ${songTitle || songInput}` 
+                text: `❌ Failed to get download link for: ${songTitle}\n\nTry searching on YouTube directly` 
             }, { quoted: msg });
         }
 
@@ -169,7 +107,7 @@ const song = async (sock, msg, args, context) => {
                     body: artist,
                     thumbnailUrl: thumbnail,
                     mediaType: 2,
-                    mediaUrl: `https://music.youtube.com/watch?v=${videoId}`
+                    mediaUrl: `https://www.youtube.com/watch?v=${videoId}`
                 }
             } : undefined
         }, { quoted: msg });
