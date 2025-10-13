@@ -77,12 +77,20 @@ const song = async (sock, msg, args, context) => {
             downloadUrl = downloadResponse.data.url;
         } else if (downloadResponse.data && downloadResponse.data.downloadUrl) {
             downloadUrl = downloadResponse.data.downloadUrl;
+        } else if (downloadResponse.data && downloadResponse.data.data && downloadResponse.data.data.link) {
+            downloadUrl = downloadResponse.data.data.link;
+        } else if (downloadResponse.data && downloadResponse.data.data && downloadResponse.data.data.url) {
+            downloadUrl = downloadResponse.data.data.url;
         }
 
         if (!downloadUrl) {
-            console.log('Download response:', JSON.stringify(downloadResponse.data).substring(0, 200));
+            console.log('Full response:', JSON.stringify(downloadResponse.data));
+            
+            const trackTitle = downloadResponse.data.data?.title || 'Unknown';
+            const trackArtist = downloadResponse.data.data?.artist || 'Unknown';
+            
             return await sock.sendMessage(context.from, { 
-                text: '❌ Could not get download link. Try again later.' 
+                text: `ℹ️ Song found: ${trackTitle}\n👤 By: ${trackArtist}\n\n❌ Download not available through this API.\n\nTry:\n• Using a Spotify link directly\n• Searching on other music platforms` 
             }, { quoted: msg });
         }
 
