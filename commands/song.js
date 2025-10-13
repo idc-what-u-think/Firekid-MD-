@@ -1,9 +1,9 @@
-const axios = require('axios');
+const play = require('play-dl');
 
 const song = async (sock, msg, args, context) => {
     if (!args[0]) {
         return await sock.sendMessage(context.from, { 
-            text: `❌ Please provide a song name\n\nExample:\n${context.prefix}song Shape of You Ed Sheeran` 
+            text: `❌ Please provide a song name\n\nExample:\n${context.prefix}song Shape of You` 
         }, { quoted: msg });
     }
     
@@ -11,86 +11,70 @@ const song = async (sock, msg, args, context) => {
         const songInput = args.join(' ');
         
         await sock.sendMessage(context.from, { 
-            text: '⏳ Searching for song...' 
+            text: '🔍 Searching for song...' 
         }, { quoted: msg });
 
-        let searchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(songInput + ' audio')}`;
-        
-        const response = await axios.get('https://youtube-api.verlysen.workers.dev/search', {
-            params: {
-                query: songInput + ' audio'
-            },
-            timeout: 15000
-        });
+        const searchResults = await play.search(songInput, { limit: 1, type: 'video' });
 
-        if (!response.data || response.data.length === 0) {
+        if (!searchResults || searchResults.length === 0) {
             return await sock.sendMessage(context.from, { 
-                text: `❌ Song not found. Try searching:\n\n🔗 ${searchUrl}` 
+                text: `❌ No songs found for "${songInput}"` 
             }, { quoted: msg });
         }
 
-        const video = response.data[0];
+        const video = searchResults[0];
         const videoId = video.id;
         const title = video.title || 'Unknown';
         const channel = video.channel?.name || 'Unknown Artist';
+        const duration = video.durationInSec || 0;
+        const thumbnail = video.thumbnail?.url || '';
 
         await sock.sendMessage(context.from, { 
-            text: `⏳ Downloading: ${title}\n👤 By: ${channel}` 
+            text: `⏳ Downloading: ${title}\n👤 By: ${channel}\n⏱️ Duration: ${Math.floor(duration / 60)}:${String(duration % 60).padStart(2, '0')}` 
         }, { quoted: msg });
 
-        let downloadUrl = null;
+        const stream = await play.stream(videoId);
 
-        try {
-            const downloadResponse = await axios.get(`https://youtube-api.verlysen.workers.dev/download`, {
-                params: {
-                    id: videoId,
-                    type: 'audio'
-                },
-                timeout: 30000
-            });
-
-            if (downloadResponse.data && downloadResponse.data.url) {
-                downloadUrl = downloadResponse.data.url;
-            }
-        } catch (error) {
-            console.log('Primary API failed, trying alternative...');
-        }
-
-        if (!downloadUrl) {
-            try {
-                const altResponse = await axios.get(`https://nightly.taichikato.workers.dev/api/download`, {
-                    params: {
-                        url: `https://www.youtube.com/watch?v=${videoId}`,
-                        type: 'audio'
-                    },
-                    timeout: 30000
-                });
-
-                if (altResponse.data && altResponse.data.url) {
-                    downloadUrl = altResponse.data.url;
-                }
-            } catch (altError) {
-                console.log('Alternative API also failed');
-            }
-        }
-
-        if (!downloadUrl) {
+        if (!stream) {
             return await sock.sendMessage(context.from, { 
-                text: `❌ Could not download: ${title}\n\nYou can try downloading manually from:\nhttps://www.youtube.com/watch?v=${videoId}` 
+                text: `❌ Could not stream: ${title}` 
+            }, { quoted: msg });
+        }
+
+        const chunks = [];
+        
+        for await (const chunk of stream.stream) {
+            chunks.push(chunk);
+        }
+
+        const buffer = Buffer.concat(chunks);
+
+        if (buffer.length === 0) {
+            return await sock.sendMessage(context.from, { 
+                text: `❌ Downloaded file is empty` 
             }, { quoted: msg });
         }
 
         await sock.sendMessage(context.from, {
-            audio: { url: downloadUrl },
+            audio: buffer,
             mimetype: 'audio/mpeg',
-            fileName: `${title}.mp3`
+            fileName: `${title}.mp3`,
+            contextInfo: thumbnail ? {
+                externalAdReply: {
+                    title: title,
+                    body: channel,
+                    thumbnailUrl: thumbnail,
+                    mediaType: 2,
+                    mediaUrl: `https://www.youtube.com/watch?v=${videoId}`
+                }
+            } : undefined
         }, { quoted: msg });
         
     } catch (error) {
         console.error('Error in song command:', error.message);
         
         return await sock.sendMessage(context.from, { 
-            text: '❌ Failed to download song. Try again later.' 
+            text: `❌ Failed to download song: ${error.message}` 
         }, { quoted: msg });
     }
 };
