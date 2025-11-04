@@ -31,7 +31,7 @@ const extractSpotifyId = (input) => {
 const song = async (sock, msg, args, context) => {
     if (!args[0]) {
         return await sock.sendMessage(context.from, { 
-            text: `❌ Please provide a Spotify link\n\nExample:\n${context.prefix}song https://open.spotify.com/track/...` 
+            text: `❌ Please provide a Spotify link or song name\n\nExamples:\n${context.prefix}song https://open.spotify.com/track/...\n${context.prefix}song Shape of You Ed Sheeran` 
         }, { quoted: msg });
     }
     
@@ -39,11 +39,34 @@ const song = async (sock, msg, args, context) => {
         const input = args.join(' ');
         let spotifyTrackId = extractSpotifyId(input);
 
-        // If no track ID found in URL, reject
+        // If no track ID found in URL, search by name
         if (!spotifyTrackId) {
-            return await sock.sendMessage(context.from, { 
-                text: '❌ Please provide a valid Spotify track link\n\nExample: https://open.spotify.com/track/...' 
+            await sock.sendMessage(context.from, { 
+                text: '🔍 Searching Spotify...' 
             }, { quoted: msg });
+
+            const apiKey = getNextKey();
+            
+            const searchResponse = await axios.get('https://spotify-downloader9.p.rapidapi.com/search', {
+                params: {
+                    q: input,
+                    type: 'track',
+                    limit: 1
+                },
+                headers: {
+                    'x-rapidapi-key': apiKey,
+                    'x-rapidapi-host': 'spotify-downloader9.p.rapidapi.com'
+                },
+                timeout: 15000
+            });
+
+            if (!searchResponse.data?.tracks?.items || searchResponse.data.tracks.items.length === 0) {
+                return await sock.sendMessage(context.from, { 
+                    text: `❌ Song not found: "${input}"` 
+                }, { quoted: msg });
+            }
+
+            spotifyTrackId = searchResponse.data.tracks.items[0].id;
         }
 
         await sock.sendMessage(context.from, { 
