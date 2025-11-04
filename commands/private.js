@@ -73,6 +73,53 @@ const isOwner = (sender) => {
     return senderNum === ownerNum;
 };
 
+// NEW: Helper to resolve real JID from @lid in groups
+const resolveRealJid = async (sock, sender, from, isGroup) => {
+    // If sender has @lid (WhatsApp's new Link ID format), resolve to real JID
+    if (isGroup && sender.includes('@lid')) {
+        try {
+            const groupMetadata = await sock.groupMetadata(from);
+            const senderParticipant = groupMetadata.participants.find(p => p.id === sender);
+            
+            if (senderParticipant && senderParticipant.jid) {
+                console.log(`[Private Mode] Resolved @lid ${sender} to ${senderParticipant.jid}`);
+                return senderParticipant.jid;
+            }
+        } catch (err) {
+            console.error('[Private Mode] Error resolving @lid:', err.message);
+        }
+    }
+    return sender;
+};
+
+// NEW: Check if user can use bot in private mode
+const canUseInPrivateMode = async (sock, sender, from, isGroup, isSudoFunc) => {
+    const config = loadPrivateMode();
+    
+    // If private mode is disabled, everyone can use
+    if (!config.enabled) {
+        return true;
+    }
+    
+    // Resolve @lid to real JID if needed
+    const resolvedSender = await resolveRealJid(sock, sender, from, isGroup);
+    
+    // Check if user is owner
+    if (isOwner(resolvedSender)) {
+        console.log(`[Private Mode] Owner detected: ${resolvedSender}`);
+        return true;
+    }
+    
+    // Check if user is sudo (pass the sudo check function from sudo module)
+    if (isSudoFunc && isSudoFunc(resolvedSender)) {
+        console.log(`[Private Mode] Sudo user detected: ${resolvedSender}`);
+        return true;
+    }
+    
+    console.log(`[Private Mode] User ${resolvedSender} blocked - not owner or sudo`);
+    return false;
+};
+
 const privateCmd = async (sock, msg, args, context) => {
     let sender = context.sender;
     let isOwnerCheck = isOwner(sender);
@@ -117,6 +164,10 @@ const privateCmd = async (sock, msg, args, context) => {
 │ Sudo users can use commands in DM/groups
 │ Others will be ignored
 │
+│ 🆕 *LID Support:*
+│ Now properly handles WhatsApp's new
+│ @lid privacy identifiers in groups
+│
 ╰━━━━━━━━━━━━━━━━━━━━╯`
         }, { quoted: msg });
     }
@@ -143,7 +194,7 @@ const privateCmd = async (sock, msg, args, context) => {
         
         if (savePrivateMode(true)) {
             return await sock.sendMessage(context.from, {
-                text: '✅ Private mode ENABLED\n\n🔒 Bot will now only respond to owner and sudo users'
+                text: '✅ Private mode ENABLED\n\n🔒 Bot will now only respond to owner and sudo users\n🆕 Includes support for @lid identifiers'
             }, { quoted: msg });
         } else {
             return await sock.sendMessage(context.from, {
@@ -180,5 +231,7 @@ module.exports = {
         return config.enabled;
     },
     isOwner,
-    normalizeNumber
+    normalizeNumber,
+    canUseInPrivateMode,  // NEW: Export this for use in main handler
+    resolveRealJid        // NEW: Export this helper
 };
