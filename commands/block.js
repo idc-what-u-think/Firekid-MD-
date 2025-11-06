@@ -1,29 +1,31 @@
 const normalizeNumber = (jidOrNum) => {
-  if (!jidOrNum) return '';
-  let str = jidOrNum.toString();
+    if (!jidOrNum) return '';
+    let str = jidOrNum.toString();
 
-  const atIndex = str.indexOf('@');
-  if (atIndex !== -1) {
-    const local = str.slice(0, atIndex);
-    const domain = str.slice(atIndex);
-    const cleanedLocal = local.split(':')[0];
-    str = cleanedLocal + domain;
-  } else {
+    // Remove any JID or device tag after :
     str = str.split(':')[0];
-  }
 
-  const digits = str.replace(/[^0-9]/g, '');
-  return digits.replace(/^0+/, '');
+    // Extract only digits
+    const digits = str.replace(/[^0-9]/g, '');
+    return digits.replace(/^0+/, ''); // remove leading zeros
 };
 
 const isOwner = (sender) => {
     const ownerNumber = process.env.OWNER_NUMBER;
     if (!ownerNumber) return false;
-    
+
     const senderNum = normalizeNumber(sender);
     const ownerNum = normalizeNumber(ownerNumber);
-    
+
     return senderNum === ownerNum;
+};
+
+const getValidWhatsAppJid = async (sock, number) => {
+    const normalized = normalizeNumber(number);
+    const query = await sock.onWhatsApp(normalized);
+
+    if (!query || !query[0]?.jid) return null;
+    return query[0].jid;
 };
 
 const blockUser = async (sock, msg, args, context) => {
@@ -32,49 +34,43 @@ const blockUser = async (sock, msg, args, context) => {
             text: '❌ Only the bot owner can block users' 
         }, { quoted: msg });
     }
-    
-    const quotedMsg = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+
     const quotedSender = msg.message?.extendedTextMessage?.contextInfo?.participant;
-    
-    if (!quotedSender && !args[0]) {
-        return await sock.sendMessage(context.from, { 
-            text: `❌ Reply to user's message or provide their number\n\nExample: ${context.prefix}block 2348012345678` 
+    let targetNumber = quotedSender || args[0];
+
+    if (!targetNumber) {
+        return await sock.sendMessage(context.from, {
+            text: `❌ Reply to a user’s message or include their number\n\nExample: ${context.prefix}block 2348012345678`
         }, { quoted: msg });
     }
-    
-    try {
-        let userToBlock;
-        
-        if (quotedSender) {
-            userToBlock = quotedSender;
-            if (!userToBlock.includes('@')) {
-                userToBlock = userToBlock + '@s.whatsapp.net';
-            }
-        } else if (args[0]) {
-            const number = args[0].replace(/[^0-9]/g, '');
-            userToBlock = number + '@s.whatsapp.net';
-        }
-        
-        const userNumber = userToBlock.split('@')[0];
-        
-        if (isOwner(userToBlock)) {
-            return await sock.sendMessage(context.from, { 
-                text: '❌ You cannot block yourself' 
-            }, { quoted: msg });
-        }
 
-        console.log(`[Block Command] Blocking user: ${userToBlock}`);
-        
-        await sock.updateBlockStatus(userToBlock, 'block');
-        
-        return await sock.sendMessage(context.from, { 
-            text: `✅ User blocked successfully\n📱 Number: +${userNumber}` 
+    const jid = await getValidWhatsAppJid(sock, targetNumber);
+
+    if (!jid) {
+        return await sock.sendMessage(context.from, {
+            text: `❌ Number is not registered on WhatsApp`
         }, { quoted: msg });
-        
+    }
+
+    if (isOwner(jid)) {
+        return sock.sendMessage(context.from, {
+            text: '❌ You cannot block yourself'
+        }, { quoted: msg });
+    }
+
+    try {
+        console.log(`[Block Command] Blocking user: ${jid}`);
+
+        await sock.updateBlockStatus(jid, 'block');
+
+        return await sock.sendMessage(context.from, {
+            text: `✅ Blocked Successfully\n📱 +${normalizeNumber(jid)}`
+        }, { quoted: msg });
+
     } catch (error) {
-        console.error('Error in block command:', error.message);
-        return await sock.sendMessage(context.from, { 
-            text: `❌ Failed to block user: ${error.message}` 
+        console.error('Block Error:', error);
+        return await sock.sendMessage(context.from, {
+            text: '❌ Failed to block user'
         }, { quoted: msg });
     }
 };
@@ -85,43 +81,37 @@ const unblockUser = async (sock, msg, args, context) => {
             text: '❌ Only the bot owner can unblock users' 
         }, { quoted: msg });
     }
-    
-    const quotedMsg = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+
     const quotedSender = msg.message?.extendedTextMessage?.contextInfo?.participant;
-    
-    if (!quotedSender && !args[0]) {
-        return await sock.sendMessage(context.from, { 
-            text: `❌ Reply to user's message or provide their number\n\nExample: ${context.prefix}unblock 2348012345678` 
+    let targetNumber = quotedSender || args[0];
+
+    if (!targetNumber) {
+        return await sock.sendMessage(context.from, {
+            text: `❌ Reply to a user’s message or include their number\n\nExample: ${context.prefix}unblock 2348012345678`
         }, { quoted: msg });
     }
-    
-    try {
-        let userToUnblock;
-        
-        if (quotedSender) {
-            userToUnblock = quotedSender;
-            if (!userToUnblock.includes('@')) {
-                userToUnblock = userToUnblock + '@s.whatsapp.net';
-            }
-        } else if (args[0]) {
-            const number = args[0].replace(/[^0-9]/g, '');
-            userToUnblock = number + '@s.whatsapp.net';
-        }
-        
-        const userNumber = userToUnblock.split('@')[0];
-        
-        console.log(`[Unblock Command] Unblocking user: ${userToUnblock}`);
-        
-        await sock.updateBlockStatus(userToUnblock, 'unblock');
-        
-        return await sock.sendMessage(context.from, { 
-            text: `✅ User unblocked successfully\n📱 Number: +${userNumber}` 
+
+    const jid = await getValidWhatsAppJid(sock, targetNumber);
+
+    if (!jid) {
+        return await sock.sendMessage(context.from, {
+            text: `❌ Number is not registered on WhatsApp`
         }, { quoted: msg });
-        
+    }
+
+    try {
+        console.log(`[Unblock Command] Unblocking user: ${jid}`);
+
+        await sock.updateBlockStatus(jid, 'unblock');
+
+        return await sock.sendMessage(context.from, {
+            text: `✅ Unblocked Successfully\n📱 +${normalizeNumber(jid)}`
+        }, { quoted: msg });
+
     } catch (error) {
-        console.error('Error in unblock command:', error.message);
-        return await sock.sendMessage(context.from, { 
-            text: `❌ Failed to unblock user: ${error.message}` 
+        console.error('Unblock Error:', error);
+        return await sock.sendMessage(context.from, {
+            text: '❌ Failed to unblock user'
         }, { quoted: msg });
     }
 };
