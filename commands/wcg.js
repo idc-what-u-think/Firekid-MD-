@@ -41,8 +41,8 @@ const wordGame = async (sock, msg, args, context) => {
         phase: 'joining',
         currentPlayer: 0,
         round: 1,
-        cycleCount: 0, // Track how many full cycles completed
-        minLetters: 3, // Start with 3 letters
+        cycleCount: 0,
+        minLetters: 3,
         currentLetter: '',
         usedWords: [],
         timer: null,
@@ -61,7 +61,9 @@ const wordGame = async (sock, msg, args, context) => {
               '• Increases by 1 letter each cycle\n' +
               '• Max 8 letters required\n' +
               '• Valid English words only\n' +
-              '• No repeating words'
+              '• No repeating words\n' +
+              '• Only correct answers advance the game\n' +
+              '• Wrong answers are ignored'
     }, { quoted: msg });
 
     let timeLeft = 60;
@@ -159,6 +161,7 @@ const nextTurn = async (sock, chatId) => {
     const game = activeGames.get(chatId);
     if (!game) return;
     
+    // Check if game should end
     if (game.players.length <= 1) {
         if (game.players.length === 1) {
             const winner = game.players[0];
@@ -166,7 +169,7 @@ const nextTurn = async (sock, chatId) => {
             
             await sock.sendMessage(chatId, { 
                 text: `🏆 *${winner.mention} WON!*\n\n` +
-                      `🎯 Total rounds: ${game.round - 1}\n` +
+                      `🎯 Total rounds: ${game.round}\n` +
                       `📝 Words used: ${wordsUsed}\n` +
                       `📏 Reached: ${game.minLetters} letters minimum\n\n` +
                       `GGs, you're a wordsmith! 🔥`,
@@ -181,13 +184,11 @@ const nextTurn = async (sock, chatId) => {
         return;
     }
     
-    // Generate random letter with weighted probability
-    // Common letters (96% chance): A-W excluding X,Y,Z
-    // Rare letters (4% chance): X,Y,Z
+    // Generate random letter
     const commonLetters = 'ABCDEFGHIJKLMNOPQRSTUVW'.split('');
     const rareLetters = ['X', 'Y', 'Z'];
     
-    const useRareLetter = Math.random() < 0.04; // 4% chance
+    const useRareLetter = Math.random() < 0.04;
     
     if (useRareLetter) {
         game.currentLetter = rareLetters[Math.floor(Math.random() * rareLetters.length)];
@@ -207,24 +208,31 @@ const nextTurn = async (sock, chatId) => {
     if (game.round >= 10) timeLimit = 12;
     
     await sock.sendMessage(chatId, { 
-        text: `${currentPlayer.mention} a word that starts with *${game.currentLetter}*, ${game.minLetters} letters minimum\n\n` +
-              `${nextPlayer.mention} get ready`,
+        text: `🎯 *Round ${game.round}*\n\n` +
+              `${currentPlayer.mention}, say a word starting with *${game.currentLetter}*\n` +
+              `📏 Minimum ${game.minLetters} letters\n` +
+              `⏰ Time: ${timeLimit}s\n\n` +
+              `⏭️ Next: ${nextPlayer.mention}`,
         mentions: [currentPlayer.id, nextPlayer.id]
     });
     
+    // Set timeout for current player
     game.timer = setTimeout(async () => {
         await sock.sendMessage(chatId, { 
             text: `⏰ ${currentPlayer.mention} ran out of time!\n\n` +
-                  `Better luck next time 👋`,
+                  `❌ ELIMINATED 👋`,
             mentions: [currentPlayer.id]
         });
         
+        // Remove the player who timed out
         game.players.splice(game.currentPlayer, 1);
         
+        // Adjust current player index if needed
         if (game.currentPlayer >= game.players.length) {
             game.currentPlayer = 0;
         }
         
+        // Continue to next turn
         setTimeout(() => nextTurn(sock, chatId), 1500);
     }, timeLimit * 1000);
 };
@@ -238,37 +246,38 @@ const checkAnswer = async (sock, msg, context) => {
     const messageText = msg.message?.conversation || 
                        msg.message?.extendedTextMessage?.text || '';
     
+    // Handle join command
     if (messageText.toLowerCase() === 'join') {
         return joinGame(sock, msg, context);
     }
     
+    // Check if game is active and in playing phase
     if (!game || game.phase !== 'playing') return;
     
+    // Check if it's the current player's turn
     const currentPlayer = game.players[game.currentPlayer];
-    if (context.sender !== currentPlayer.id) return;
+    if (context.sender !== currentPlayer.id) {
+        // Not their turn - silently ignore
+        return;
+    }
     
     const userAnswer = messageText.trim().toLowerCase();
     
     // Check if word starts with correct letter
     if (!userAnswer.startsWith(game.currentLetter.toLowerCase())) {
+        // Wrong letter - silently ignore
         return;
     }
     
-    // Check minimum length based on current cycle
+    // Check minimum length
     if (userAnswer.length < game.minLetters) {
-        await sock.sendMessage(chatId, { 
-            text: `❌ ${currentPlayer.mention} word too short! Need ${game.minLetters}+ letters`,
-            mentions: [currentPlayer.id]
-        });
+        // Too short - silently ignore
         return;
     }
     
     // Check if word was already used
     if (game.usedWords.includes(userAnswer)) {
-        await sock.sendMessage(chatId, { 
-            text: `❌ ${currentPlayer.mention} word already used!`,
-            mentions: [currentPlayer.id]
-        });
+        // Already used - silently ignore
         return;
     }
     
@@ -281,58 +290,39 @@ const checkAnswer = async (sock, msg, context) => {
     const isValid = await isValidWord(userAnswer);
     
     if (!isValid) {
+        // Invalid word - silently ignore
         await sock.sendMessage(chatId, { 
             react: { text: '❌', key: msg.key } 
         });
-        
-        await sock.sendMessage(chatId, { 
-            text: `❌ ${currentPlayer.mention} invalid word!\n\n` +
-                  `"${userAnswer}" is not a valid English word`,
-            mentions: [currentPlayer.id]
-        });
-        
-        // Give 5 second penalty and continue
-        setTimeout(() => {
-            if (game.timer) {
-                clearTimeout(game.timer);
-                game.timer = null;
-            }
-            
-            game.currentPlayer = (game.currentPlayer + 1) % game.players.length;
-            
-            if (game.currentPlayer === 0) {
-                game.round++;
-            }
-            
-            nextTurn(sock, chatId);
-        }, 5000);
-        
         return;
     }
     
-    // Valid word!
+    // ✅ VALID WORD - This is the ONLY time we advance the game
     game.usedWords.push(userAnswer);
     
+    // Clear the timer since they answered correctly
     if (game.timer) {
         clearTimeout(game.timer);
         game.timer = null;
     }
     
+    // React with success
     await sock.sendMessage(chatId, { 
         react: { text: '✅', key: msg.key } 
     });
     
-    // Show word definition if available (optional enhancement)
+    // Show confirmation
     const wordLength = userAnswer.length;
-    const bonus = wordLength >= 8 ? '🔥 Long word bonus!' : '';
+    const bonus = wordLength >= 8 ? ' 🔥 Long word bonus!' : '';
     
     await sock.sendMessage(chatId, { 
-        text: `✅ Correct! ${bonus}`
+        text: `✅ Correct!${bonus}`
     });
     
+    // Move to NEXT player
     game.currentPlayer = (game.currentPlayer + 1) % game.players.length;
     
-    // Check if we completed a full cycle (back to first player)
+    // If we completed a full cycle (back to first player)
     if (game.currentPlayer === 0) {
         game.round++;
         game.cycleCount++;
@@ -340,9 +330,13 @@ const checkAnswer = async (sock, msg, context) => {
         // Increase minimum letters every cycle, max 8
         if (game.minLetters < 8) {
             game.minLetters++;
+            await sock.sendMessage(chatId, { 
+                text: `📏 Minimum letters increased to ${game.minLetters}!` 
+            });
         }
     }
     
+    // Continue to next turn after a short delay
     setTimeout(() => nextTurn(sock, chatId), 1500);
 };
 
