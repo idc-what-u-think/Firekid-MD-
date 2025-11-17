@@ -2,7 +2,6 @@ const https = require('https');
 
 const activeGames = new Map();
 
-// Validate word using Dictionary API - just checks if word exists
 const isValidWord = (word) => {
     return new Promise((resolve) => {
         const url = `https://api.dictionaryapi.dev/api/v2/entries/en/${word.toLowerCase()}`;
@@ -46,7 +45,8 @@ const wordGame = async (sock, msg, args, context) => {
         currentLetter: '',
         usedWords: [],
         timer: null,
-        countdownTimer: null
+        countdownTimer: null,
+        waitingForAnswer: false
     };
 
     activeGames.set(chatId, game);
@@ -161,7 +161,6 @@ const nextTurn = async (sock, chatId) => {
     const game = activeGames.get(chatId);
     if (!game) return;
     
-    // Check if game should end
     if (game.players.length <= 1) {
         if (game.players.length === 1) {
             const winner = game.players[0];
@@ -184,7 +183,6 @@ const nextTurn = async (sock, chatId) => {
         return;
     }
     
-    // Generate random letter
     const commonLetters = 'ABCDEFGHIJKLMNOPQRSTUVW'.split('');
     const rareLetters = ['X', 'Y', 'Z'];
     
@@ -200,12 +198,13 @@ const nextTurn = async (sock, chatId) => {
     const nextPlayerIndex = (game.currentPlayer + 1) % game.players.length;
     const nextPlayer = game.players[nextPlayerIndex];
     
-    // Progressive time reduction
     let timeLimit = 30;
     if (game.round >= 3) timeLimit = 25;
     if (game.round >= 5) timeLimit = 20;
     if (game.round >= 7) timeLimit = 15;
     if (game.round >= 10) timeLimit = 12;
+    
+    game.waitingForAnswer = true;
     
     await sock.sendMessage(chatId, { 
         text: `🎯 *Round ${game.round}*\n\n` +
@@ -216,23 +215,23 @@ const nextTurn = async (sock, chatId) => {
         mentions: [currentPlayer.id, nextPlayer.id]
     });
     
-    // Set timeout for current player
     game.timer = setTimeout(async () => {
+        if (!game.waitingForAnswer) return;
+        
+        game.waitingForAnswer = false;
+        
         await sock.sendMessage(chatId, { 
             text: `⏰ ${currentPlayer.mention} ran out of time!\n\n` +
                   `❌ ELIMINATED 👋`,
             mentions: [currentPlayer.id]
         });
         
-        // Remove the player who timed out
         game.players.splice(game.currentPlayer, 1);
         
-        // Adjust current player index if needed
         if (game.currentPlayer >= game.players.length) {
             game.currentPlayer = 0;
         }
         
-        // Continue to next turn
         setTimeout(() => nextTurn(sock, chatId), 1500);
     }, timeLimit * 1000);
 };
@@ -246,72 +245,56 @@ const checkAnswer = async (sock, msg, context) => {
     const messageText = msg.message?.conversation || 
                        msg.message?.extendedTextMessage?.text || '';
     
-    // Handle join command
     if (messageText.toLowerCase() === 'join') {
         return joinGame(sock, msg, context);
     }
     
-    // Check if game is active and in playing phase
-    if (!game || game.phase !== 'playing') return;
+    if (!game || game.phase !== 'playing' || !game.waitingForAnswer) return;
     
-    // Check if it's the current player's turn
     const currentPlayer = game.players[game.currentPlayer];
     if (context.sender !== currentPlayer.id) {
-        // Not their turn - silently ignore
         return;
     }
     
     const userAnswer = messageText.trim().toLowerCase();
     
-    // Check if word starts with correct letter
     if (!userAnswer.startsWith(game.currentLetter.toLowerCase())) {
-        // Wrong letter - silently ignore
         return;
     }
     
-    // Check minimum length
     if (userAnswer.length < game.minLetters) {
-        // Too short - silently ignore
         return;
     }
     
-    // Check if word was already used
     if (game.usedWords.includes(userAnswer)) {
-        // Already used - silently ignore
         return;
     }
     
-    // Show checking message
     await sock.sendMessage(chatId, { 
         react: { text: '⏳', key: msg.key } 
     });
     
-    // Validate word using dictionary API
     const isValid = await isValidWord(userAnswer);
     
     if (!isValid) {
-        // Invalid word - silently ignore
         await sock.sendMessage(chatId, { 
             react: { text: '❌', key: msg.key } 
         });
         return;
     }
     
-    // ✅ VALID WORD - This is the ONLY time we advance the game
+    game.waitingForAnswer = false;
     game.usedWords.push(userAnswer);
     
-    // Clear the timer since they answered correctly
     if (game.timer) {
         clearTimeout(game.timer);
         game.timer = null;
     }
     
-    // React with success
     await sock.sendMessage(chatId, { 
         react: { text: '✅', key: msg.key } 
     });
     
-    // Show confirmation
     const wordLength = userAnswer.length;
     const bonus = wordLength >= 8 ? ' 🔥 Long word bonus!' : '';
     
@@ -319,15 +302,12 @@ const checkAnswer = async (sock, msg, context) => {
         text: `✅ Correct!${bonus}`
     });
     
-    // Move to NEXT player
     game.currentPlayer = (game.currentPlayer + 1) % game.players.length;
     
-    // If we completed a full cycle (back to first player)
     if (game.currentPlayer === 0) {
         game.round++;
         game.cycleCount++;
         
-        // Increase minimum letters every cycle, max 8
         if (game.minLetters < 8) {
             game.minLetters++;
             await sock.sendMessage(chatId, { 
@@ -336,7 +316,6 @@ const checkAnswer = async (sock, msg, context) => {
         }
     }
     
-    // Continue to next turn after a short delay
     setTimeout(() => nextTurn(sock, chatId), 1500);
 };
 
