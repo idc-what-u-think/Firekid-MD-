@@ -88,6 +88,7 @@ const menu = async (sock, msg, args, context) => {
 │ • weather - Weather info
 │ • guess - Guess the riddle
 │ • wcg - Play a word game
+│ • quiz - Play a quiz game with friends
 │
 ╰━━━━━━━━━━━━━━━━━━━━╯
 ╭━━━『 *OWNER ONLY* 』━━━╮
