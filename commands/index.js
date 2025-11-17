@@ -7,7 +7,7 @@ const commandList = [
     'vv', 'delete', 'kick', 'tagall', 'promote', 'mute', 'unmute', 'left',
     'tag', 'welcome', 'setgrppp', 'antilnk', 'sticker', 'toimg', 'filter',
     'country', 'kill', 'online', 'block', 'ttdownload', 'song', 'lyrics',
-    'weather', 'movie', 'private', 'update', 'guess', 'wcg' 
+    'weather', 'movie', 'private', 'update', 'guess', 'wcg', 'quiz'
 ];
 
 const fetchFileFromGitHub = (token, owner, repo, filePath, branch = 'main') => {
