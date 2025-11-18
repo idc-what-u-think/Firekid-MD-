@@ -73,9 +73,7 @@ const isOwner = (sender) => {
     return senderNum === ownerNum;
 };
 
-// NEW: Helper to resolve real JID from @lid in groups
 const resolveRealJid = async (sock, sender, from, isGroup) => {
-    // If sender has @lid (WhatsApp's new Link ID format), resolve to real JID
     if (isGroup && sender.includes('@lid')) {
         try {
             const groupMetadata = await sock.groupMetadata(from);
@@ -92,25 +90,20 @@ const resolveRealJid = async (sock, sender, from, isGroup) => {
     return sender;
 };
 
-// NEW: Check if user can use bot in private mode
 const canUseInPrivateMode = async (sock, sender, from, isGroup, isSudoFunc) => {
     const config = loadPrivateMode();
     
-    // If private mode is disabled, everyone can use
     if (!config.enabled) {
         return true;
     }
     
-    // Resolve @lid to real JID if needed
     const resolvedSender = await resolveRealJid(sock, sender, from, isGroup);
     
-    // Check if user is owner
     if (isOwner(resolvedSender)) {
         console.log(`[Private Mode] Owner detected: ${resolvedSender}`);
         return true;
     }
     
-    // Check if user is sudo (pass the sudo check function from sudo module)
     if (isSudoFunc && isSudoFunc(resolvedSender)) {
         console.log(`[Private Mode] Sudo user detected: ${resolvedSender}`);
         return true;
@@ -118,6 +111,22 @@ const canUseInPrivateMode = async (sock, sender, from, isGroup, isSudoFunc) => {
     
     console.log(`[Private Mode] User ${resolvedSender} blocked - not owner or sudo`);
     return false;
+};
+
+// Auto-enable function called on bot startup
+const autoEnablePrivateMode = () => {
+    const config = loadPrivateMode();
+    
+    // Enable private mode on startup (even if already enabled, to ensure it's on)
+    const success = savePrivateMode(true);
+    
+    if (success) {
+        console.log('🔒 Private mode auto-enabled on startup');
+    } else {
+        console.log('⚠️ Failed to auto-enable private mode');
+    }
+    
+    return success;
 };
 
 const privateCmd = async (sock, msg, args, context) => {
@@ -148,27 +157,9 @@ const privateCmd = async (sock, msg, args, context) => {
     
     if (!action || !['on', 'off', 'status'].includes(action)) {
         const config = loadPrivateMode();
-        const status = config.enabled ? '🟢 ON' : '🔴 OFF';
+        const status = config.enabled ? '🟢 ON (Auto-enabled on startup)' : '🔴 OFF';
         return await sock.sendMessage(context.from, {
-            text: `╭━━━『 *PRIVATE MODE* 』━━━╮
-│
-│ 📊 *Current Status:* ${status}
-│
-│ *Usage:*
-│ • ${context.prefix}private on
-│ • ${context.prefix}private off
-│ • ${context.prefix}private status
-│
-│ *When enabled:*
-│ Only the owner can use commands
-│ Sudo users can use commands in DM/groups
-│ Others will be ignored
-│
-│ 🆕 *LID Support:*
-│ Now properly handles WhatsApp's new
-│ @lid privacy identifiers in groups
-│
-╰━━━━━━━━━━━━━━━━━━━━╯`
+            text: `╭━━━『 *PRIVATE MODE* 』━━━╮\n│\n│ 📊 *Current Status:* ${status}\n│\n│ *Usage:*\n│ • ${context.prefix}private on\n│ • ${context.prefix}private off\n│ • ${context.prefix}private status\n│\n│ *When enabled:*\n│ Only the owner can use commands\n│ Sudo users can use commands in DM/groups\n│ Others will be ignored\n│\n│ 🔒 *Auto-enabled on startup*\n│ Private mode turns ON automatically\n│ when the bot starts for security\n│\n│ 🆕 *LID Support:*\n│ Now properly handles WhatsApp's new\n│ @lid privacy identifiers in groups\n│\n╰━━━━━━━━━━━━━━━━━━━━╯`
         }, { quoted: msg });
     }
     
@@ -213,7 +204,7 @@ const privateCmd = async (sock, msg, args, context) => {
         
         if (savePrivateMode(false)) {
             return await sock.sendMessage(context.from, {
-                text: '✅ Private mode DISABLED\n\n🔓 Bot will now respond to everyone'
+                text: '✅ Private mode DISABLED\n\n🔓 Bot will now respond to everyone\n\n⚠️ Note: Private mode will auto-enable on next restart'
             }, { quoted: msg });
         } else {
             return await sock.sendMessage(context.from, {
@@ -232,6 +223,7 @@ module.exports = {
     },
     isOwner,
     normalizeNumber,
-    canUseInPrivateMode,  // NEW: Export this for use in main handler
-    resolveRealJid        // NEW: Export this helper
+    canUseInPrivateMode,
+    resolveRealJid,
+    autoEnablePrivateMode  // NEW: Export for index.js to call on startup
 };
