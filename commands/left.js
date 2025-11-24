@@ -3,7 +3,6 @@ const leftMessageEnabled = new Set();
 const normalizeNumber = (jidOrNum) => {
   if (!jidOrNum) return '';
   let str = jidOrNum.toString();
-
   const atIndex = str.indexOf('@');
   if (atIndex !== -1) {
     const local = str.slice(0, atIndex);
@@ -13,7 +12,6 @@ const normalizeNumber = (jidOrNum) => {
   } else {
     str = str.split(':')[0];
   }
-
   const digits = str.replace(/[^0-9]/g, '');
   return digits.replace(/^0+/, '');
 };
@@ -62,42 +60,78 @@ const leftHandler = async (sock, msg, args, context) => {
             }, { quoted: msg });
         }
         
-        leftMessageEnabled.add(context.from);
+        // Check if there's an argument (on/off)
+        const action = args[0]?.toLowerCase();
         
+        if (action === 'off') {
+            if (!leftMessageEnabled.has(context.from)) {
+                return await sock.sendMessage(context.from, { 
+                    text: '❌ Left message is already disabled' 
+                }, { quoted: msg });
+            }
+            
+            leftMessageEnabled.delete(context.from);
+            return await sock.sendMessage(context.from, { 
+                text: '✅ Left message notification has been disabled' 
+            }, { quoted: msg });
+        }
+        
+        if (action === 'on') {
+            if (leftMessageEnabled.has(context.from)) {
+                return await sock.sendMessage(context.from, { 
+                    text: '❌ Left message is already enabled' 
+                }, { quoted: msg });
+            }
+            
+            leftMessageEnabled.add(context.from);
+            return await sock.sendMessage(context.from, { 
+                text: '✅ Left message notification has been enabled\n\n👋 Members who leave will get a goodbye message' 
+            }, { quoted: msg });
+        }
+        
+        // Show current status if no valid action
+        const isEnabled = leftMessageEnabled.has(context.from);
         return await sock.sendMessage(context.from, { 
-            text: '✅ Left message notification has been enabled' 
+            text: `📊 Left Message Status: ${isEnabled ? 'ON ✅' : 'OFF ❌'}\n\nUsage:\n• \`.left on\` - Enable goodbye messages\n• \`.left off\` - Disable goodbye messages` 
         }, { quoted: msg });
         
     } catch (error) {
         console.error('Error in left command:', error.message);
         return await sock.sendMessage(context.from, { 
-            text: '❌ Failed to enable left message' 
+            text: '❌ Failed to toggle left message' 
         }, { quoted: msg });
     }
 };
 
 const handleLeft = async (sock, groupId, participants, action, actor) => {
+    // Only send message if enabled for this group
     if (!leftMessageEnabled.has(groupId)) return;
     
-    for (const participant of participants) {
-        const participantNumber = normalizeNumber(participant);
-        
-        if (action === 'remove' && actor) {
-            const actorNumber = normalizeNumber(actor);
-            const leftMsg = `@${participantNumber} bites the dust. Removed by @${actorNumber}`;
+    try {
+        for (const participant of participants) {
+            const participantNumber = normalizeNumber(participant);
             
-            await sock.sendMessage(groupId, {
-                text: leftMsg,
-                mentions: [participant, actor]
-            });
-        } else {
-            const leftMsg = `@${participantNumber} left`;
-            
-            await sock.sendMessage(groupId, {
-                text: leftMsg,
-                mentions: [participant]
-            });
+            // Check if participant was removed by someone or left voluntarily
+            if (action === 'remove' && actor) {
+                const actorNumber = normalizeNumber(actor);
+                const leftMsg = `👋 @${participantNumber} bites the dust. Removed by @${actorNumber}`;
+                
+                await sock.sendMessage(groupId, {
+                    text: leftMsg,
+                    mentions: [participant, actor]
+                });
+            } else {
+                // Participant left on their own
+                const leftMsg = `👋 @${participantNumber} left the group. Goodbye!`;
+                
+                await sock.sendMessage(groupId, {
+                    text: leftMsg,
+                    mentions: [participant]
+                });
+            }
         }
+    } catch (error) {
+        console.error('Error sending left message:', error.message);
     }
 };
 
