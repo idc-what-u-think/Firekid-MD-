@@ -60,7 +60,6 @@ const leftHandler = async (sock, msg, args, context) => {
             }, { quoted: msg });
         }
         
-        // Check if there's an argument (on/off)
         const action = args[0]?.toLowerCase();
         
         if (action === 'off') {
@@ -89,14 +88,12 @@ const leftHandler = async (sock, msg, args, context) => {
             }, { quoted: msg });
         }
         
-        // Show current status if no valid action
         const isEnabled = leftMessageEnabled.has(context.from);
         return await sock.sendMessage(context.from, { 
             text: `📊 Left Message Status: ${isEnabled ? 'ON ✅' : 'OFF ❌'}\n\nUsage:\n• \`.left on\` - Enable goodbye messages\n• \`.left off\` - Disable goodbye messages` 
         }, { quoted: msg });
         
     } catch (error) {
-        console.error('Error in left command:', error.message);
         return await sock.sendMessage(context.from, { 
             text: '❌ Failed to toggle left message' 
         }, { quoted: msg });
@@ -104,14 +101,12 @@ const leftHandler = async (sock, msg, args, context) => {
 };
 
 const handleLeft = async (sock, groupId, participants, action, actor) => {
-    // Only send message if enabled for this group
     if (!leftMessageEnabled.has(groupId)) return;
     
     try {
         for (const participant of participants) {
             const participantNumber = normalizeNumber(participant);
             
-            // Check if participant was removed by someone or left voluntarily
             if (action === 'remove' && actor) {
                 const actorNumber = normalizeNumber(actor);
                 const leftMsg = `👋 @${participantNumber} bites the dust. Removed by @${actorNumber}`;
@@ -121,7 +116,6 @@ const handleLeft = async (sock, groupId, participants, action, actor) => {
                     mentions: [participant, actor]
                 });
             } else {
-                // Participant left on their own
                 const leftMsg = `👋 @${participantNumber} left the group. Goodbye!`;
                 
                 await sock.sendMessage(groupId, {
@@ -131,7 +125,7 @@ const handleLeft = async (sock, groupId, participants, action, actor) => {
             }
         }
     } catch (error) {
-        console.error('Error sending left message:', error.message);
+        // Silent error handling
     }
 };
 
