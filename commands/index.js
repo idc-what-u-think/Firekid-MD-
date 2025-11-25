@@ -5,7 +5,7 @@ const path = require('path');
 const commandList = [
     'sudo', 'warn', 'resetwarning', 'allowdomain', 'menu', 'ping', 'alive',
     'vv', 'delete', 'kick', 'tagall', 'promote', 'mute', 'unmute', 'left',
-    'tag', 'welcome', 'setgrppp', 'antilnk', 'sticker', 'toimg', 'filter',
+    'tag', 'welcome', 'setgrppp', 'antilink', 'sticker', 'toimg', 'filter',
     'country', 'kill', 'online', 'block', 'ttdownload', 'song', 'lyrics',
     'weather', 'movie', 'private', 'update', 'guess', 'wcg', 'quiz', 'welcome'
 ];
