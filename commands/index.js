@@ -7,7 +7,7 @@ const commandList = [
     'vv', 'delete', 'kick', 'tagall', 'promote', 'mute', 'unmute', 'left',
     'tag', 'welcome', 'setgrppp', 'antilink', 'sticker', 'toimg', 'filter',
     'country', 'kill', 'online', 'block', 'ttdownload', 'song', 'lyrics',
-    'weather', 'movie', 'private', 'update', 'guess', 'wcg', 'quiz', 'welcome'
+    'weather', 'movie', 'private', 'update', 'guess', 'wcg', 'quiz'
 ];
 
 const fetchFileFromGitHub = (token, owner, repo, filePath, branch = 'main') => {
@@ -57,10 +57,11 @@ const loadCommands = async (githubToken, repoUrl) => {
         fs.mkdirSync(tempDir, { recursive: true });
     }
     
+    let loadedCount = 0;
+    
     for (const commandName of commandList) {
         try {
             const fileName = `${commandName}.js`;
-            console.log(`📥 Fetching ${fileName}...`);
             
             const content = await fetchFileFromGitHub(githubToken, owner, repo, `commands/${fileName}`);
             
@@ -69,21 +70,62 @@ const loadCommands = async (githubToken, repoUrl) => {
             
             delete require.cache[require.resolve(tempFilePath)];
             
-            const loadedCommand = require(tempFilePath);
-            commands[commandName] = loadedCommand;
+            const command = require(tempFilePath);
             
-            console.log(`✅ Loaded: ${commandName}`);
+            // Pattern 1: Standard export with command and handler
+            if (command && command.command && command.handler) {
+                commands[command.command] = command;
+                loadedCount++;
+            }
+            // Pattern 2: Direct handler export
+            else if (command && command.handler) {
+                commands[commandName] = command;
+                loadedCount++;
+            }
+            // Pattern 3: Multiple direct function exports (like block.js)
+            else if (command && typeof command === 'object') {
+                let hasValidExport = false;
+                
+                for (const [key, value] of Object.entries(command)) {
+                    if (typeof value === 'function') {
+                        // Direct function export
+                        commands[key] = { 
+                            command: key, 
+                            handler: value,
+                            ...command // Preserve other exports
+                        };
+                        loadedCount++;
+                        hasValidExport = true;
+                    } else if (value && typeof value === 'object' && value.handler) {
+                        // Nested object with handler
+                        commands[key] = value;
+                        loadedCount++;
+                        hasValidExport = true;
+                    }
+                }
+                
+                // Keep the full command object accessible too
+                if (hasValidExport) {
+                    commands[commandName] = command;
+                }
+            }
+            // Pattern 4: Direct function export
+            else if (typeof command === 'function') {
+                commands[commandName] = { command: commandName, handler: command };
+                loadedCount++;
+            }
+            
         } catch (error) {
-            console.error(`❌ Failed to load ${commandName}: ${error.message}`);
+            // Silent error handling
         }
     }
     
-    console.log(`📦 Total commands loaded: ${Object.keys(commands).length}`);
+    console.log(`✅ ${loadedCount} plugins loaded`);
     return commands;
 };
 
 const reloadCommandsFromGitHub = async (githubToken, repoUrl) => {
-    console.log('🔄 Reloading commands from GitHub...');
+    console.log('🔄 Reloading commands...');
     return await loadCommands(githubToken, repoUrl);
 };
 
