@@ -3,7 +3,6 @@ const joinMessageEnabled = new Set();
 const normalizeNumber = (jidOrNum) => {
   if (!jidOrNum) return '';
   let str = jidOrNum.toString();
-
   const atIndex = str.indexOf('@');
   if (atIndex !== -1) {
     const local = str.slice(0, atIndex);
@@ -13,7 +12,6 @@ const normalizeNumber = (jidOrNum) => {
   } else {
     str = str.split(':')[0];
   }
-
   const digits = str.replace(/[^0-9]/g, '');
   return digits.replace(/^0+/, '');
 };
@@ -62,21 +60,50 @@ const welcomeHandler = async (sock, msg, args, context) => {
             }, { quoted: msg });
         }
         
-        joinMessageEnabled.add(context.from);
+        // Check if there's an argument (on/off)
+        const action = args[0]?.toLowerCase();
         
+        if (action === 'off') {
+            if (!joinMessageEnabled.has(context.from)) {
+                return await sock.sendMessage(context.from, { 
+                    text: '❌ Welcome message is already disabled' 
+                }, { quoted: msg });
+            }
+            
+            joinMessageEnabled.delete(context.from);
+            return await sock.sendMessage(context.from, { 
+                text: '✅ Welcome message notification has been disabled' 
+            }, { quoted: msg });
+        }
+        
+        if (action === 'on') {
+            if (joinMessageEnabled.has(context.from)) {
+                return await sock.sendMessage(context.from, { 
+                    text: '❌ Welcome message is already enabled' 
+                }, { quoted: msg });
+            }
+            
+            joinMessageEnabled.add(context.from);
+            return await sock.sendMessage(context.from, { 
+                text: '✅ Welcome message notification has been enabled\n\n👋 New members will receive a welcome message' 
+            }, { quoted: msg });
+        }
+        
+        // Show current status if no valid action
+        const isEnabled = joinMessageEnabled.has(context.from);
         return await sock.sendMessage(context.from, { 
-            text: '✅ Welcome message notification has been enabled' 
+            text: `📊 Welcome Message Status: ${isEnabled ? 'ON ✅' : 'OFF ❌'}\n\nUsage:\n• \`.welcome on\` - Enable welcome messages\n• \`.welcome off\` - Disable welcome messages` 
         }, { quoted: msg });
         
     } catch (error) {
-        console.error('Error in welcome command:', error.message);
         return await sock.sendMessage(context.from, { 
-            text: '❌ Failed to enable welcome message' 
+            text: '❌ Failed to toggle welcome message' 
         }, { quoted: msg });
     }
 };
 
 const handleJoin = async (sock, groupId, participants) => {
+    // Only send message if enabled for this group
     if (!joinMessageEnabled.has(groupId)) return;
     
     try {
@@ -92,7 +119,7 @@ const handleJoin = async (sock, groupId, participants) => {
             });
         }
     } catch (error) {
-        console.error('Error in handleJoin:', error.message);
+        // Silent error handling
     }
 };
 
