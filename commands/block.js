@@ -21,7 +21,6 @@ const getValidWhatsAppJid = async (sock, number) => {
         if (!query || !query[0]?.jid) return null;
         return query[0].jid;
     } catch (error) {
-        console.error('Error validating WhatsApp JID:', error);
         return null;
     }
 };
@@ -63,7 +62,6 @@ const blockUser = async (sock, msg, args, context) => {
     }
 
     try {
-        console.log(`[Block] Blocking user: ${jid}`);
         await sock.updateBlockStatus(jid, 'block');
         
         const blockedNumber = normalizeNumber(jid);
@@ -81,7 +79,6 @@ const blockUser = async (sock, msg, args, context) => {
         }, { quoted: msg });
         
     } catch (error) {
-        console.error('[Block] Error:', error);
         return await sock.sendMessage(context.from, {
             text: `❌ Failed to block user\n\nError: ${error.message}`
         }, { quoted: msg });
@@ -119,7 +116,6 @@ const unblockUser = async (sock, msg, args, context) => {
     }
 
     try {
-        console.log(`[Unblock] Unblocking user: ${jid}`);
         await sock.updateBlockStatus(jid, 'unblock');
         
         const unblockedNumber = normalizeNumber(jid);
@@ -137,7 +133,6 @@ const unblockUser = async (sock, msg, args, context) => {
         }, { quoted: msg });
         
     } catch (error) {
-        console.error('[Unblock] Error:', error);
         return await sock.sendMessage(context.from, {
             text: `❌ Failed to unblock user\n\nError: ${error.message}`
         }, { quoted: msg });
@@ -152,7 +147,6 @@ const listBlocked = async (sock, msg, args, context) => {
     }
 
     try {
-        console.log('[Blocked List] Fetching blocked users...');
         const blockedList = await sock.fetchBlocklist();
         
         if (!blockedList || blockedList.length === 0) {
@@ -180,24 +174,15 @@ const listBlocked = async (sock, msg, args, context) => {
         }, { quoted: msg });
         
     } catch (error) {
-        console.error('[Blocked List] Error:', error);
         return await sock.sendMessage(context.from, {
             text: `❌ Failed to fetch blocked list\n\nError: ${error.message}`
         }, { quoted: msg });
     }
 };
 
+// Export each command separately so commandLoader can pick them up
 module.exports = {
-    block: {
-        command: 'block',
-        handler: blockUser
-    },
-    unblock: {
-        command: 'unblock',
-        handler: unblockUser
-    },
-    blocklist: {
-        command: 'blocklist',
-        handler: listBlocked
-    }
+    block: blockUser,
+    unblock: unblockUser,
+    blocklist: listBlocked
 };
