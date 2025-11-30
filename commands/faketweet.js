@@ -133,8 +133,8 @@ async function generateFakeTweet(celebrity, message) {
         const canvas = createCanvas(width, height);
         const ctx = canvas.getContext('2d');
 
-        // Background - Twitter dark theme
-        ctx.fillStyle = '#000000';
+        // Background - White (Twitter light theme)
+        ctx.fillStyle = '#FFFFFF';
         ctx.fillRect(0, 0, width, height);
 
         // Load avatar
@@ -162,7 +162,7 @@ async function generateFakeTweet(celebrity, message) {
         }
 
         // Draw name
-        ctx.fillStyle = '#E7E9EA';
+        ctx.fillStyle = '#0F1419';
         ctx.font = 'bold 32px Arial';
         ctx.fillText(celebrity.name, 190, 95);
 
@@ -178,12 +178,12 @@ async function generateFakeTweet(celebrity, message) {
         }
 
         // Draw handle
-        ctx.fillStyle = '#71767B';
+        ctx.fillStyle = '#536471';
         ctx.font = '28px Arial';
         ctx.fillText(`@${celebrity.handle}`, 190, 130);
 
         // Draw tweet text
-        ctx.fillStyle = '#E7E9EA';
+        ctx.fillStyle = '#0F1419';
         ctx.font = '36px Arial';
         const lines = wrapText(ctx, message, width - 200);
         let yPosition = 200;
@@ -194,7 +194,7 @@ async function generateFakeTweet(celebrity, message) {
 
         // Draw time
         yPosition += 30;
-        ctx.fillStyle = '#71767B';
+        ctx.fillStyle = '#536471';
         ctx.font = '28px Arial';
         ctx.fillText(getCurrentTime(), 100, yPosition);
         ctx.fillText(' · ', 100 + ctx.measureText(getCurrentTime()).width, yPosition);
@@ -205,7 +205,7 @@ async function generateFakeTweet(celebrity, message) {
 
         // Divider line
         yPosition += 40;
-        ctx.strokeStyle = '#2F3336';
+        ctx.strokeStyle = '#EFF3F4';
         ctx.lineWidth = 2;
         ctx.beginPath();
         ctx.moveTo(100, yPosition);
@@ -215,43 +215,43 @@ async function generateFakeTweet(celebrity, message) {
         // Engagement stats
         const engagement = getRandomEngagement();
         yPosition += 50;
-        ctx.fillStyle = '#E7E9EA';
+        ctx.fillStyle = '#0F1419';
         ctx.font = 'bold 28px Arial';
         
         let xPos = 100;
         ctx.fillText(formatNumber(engagement.retweets), xPos, yPosition);
-        ctx.fillStyle = '#71767B';
+        ctx.fillStyle = '#536471';
         ctx.font = '28px Arial';
         xPos += ctx.measureText(formatNumber(engagement.retweets)).width + 10;
         ctx.fillText('Retweets', xPos, yPosition);
         
         xPos += ctx.measureText('Retweets').width + 40;
-        ctx.fillStyle = '#E7E9EA';
+        ctx.fillStyle = '#0F1419';
         ctx.font = 'bold 28px Arial';
         ctx.fillText(formatNumber(engagement.quotes), xPos, yPosition);
-        ctx.fillStyle = '#71767B';
+        ctx.fillStyle = '#536471';
         ctx.font = '28px Arial';
         xPos += ctx.measureText(formatNumber(engagement.quotes)).width + 10;
         ctx.fillText('Quotes', xPos, yPosition);
         
         xPos += ctx.measureText('Quotes').width + 40;
-        ctx.fillStyle = '#E7E9EA';
+        ctx.fillStyle = '#0F1419';
         ctx.font = 'bold 28px Arial';
         ctx.fillText(formatNumber(engagement.likes), xPos, yPosition);
-        ctx.fillStyle = '#71767B';
+        ctx.fillStyle = '#536471';
         ctx.font = '28px Arial';
         xPos += ctx.measureText(formatNumber(engagement.likes)).width + 10;
         ctx.fillText('Likes', xPos, yPosition);
 
         // Views
         yPosition += 50;
-        ctx.fillStyle = '#71767B';
+        ctx.fillStyle = '#536471';
         ctx.font = '26px Arial';
         ctx.fillText(`${formatNumber(engagement.views)} Views`, 100, yPosition);
 
         // Another divider
         yPosition += 30;
-        ctx.strokeStyle = '#2F3336';
+        ctx.strokeStyle = '#EFF3F4';
         ctx.lineWidth = 2;
         ctx.beginPath();
         ctx.moveTo(100, yPosition);
