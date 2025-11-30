@@ -1,6 +1,4 @@
-const puppeteer = require('puppeteer');
-const fs = require('fs');
-const path = require('path');
+const axios = require('axios');
 
 const screenshot = async (sock, msg, args, context) => {
     try {
@@ -28,36 +26,18 @@ const screenshot = async (sock, msg, args, context) => {
             text: `📸 *Taking screenshot...*\n⏳ ${url}`
         }, { quoted: msg });
 
-        const tmpDir = path.join(process.cwd(), 'tmp');
-        if (!fs.existsSync(tmpDir)) {
-            fs.mkdirSync(tmpDir, { recursive: true });
-        }
+        // Using thum.io free API (1000 screenshots/month free)
+        const screenshotUrl = `https://image.thum.io/get/width/1200/crop/800/${encodeURIComponent(url)}`;
 
-        const screenshotPath = path.join(tmpDir, `screenshot_${Date.now()}.png`);
-
-        const browser = await puppeteer.launch({
-            headless: true,
-            args: [
-                '--no-sandbox', 
-                '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage',
-                '--disable-accelerated-2d-canvas',
-                '--no-first-run',
-                '--no-zygote',
-                '--single-process',
-                '--disable-gpu'
-            ],
-            executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium-browser'
+        const response = await axios.get(screenshotUrl, {
+            responseType: 'arraybuffer',
+            timeout: 30000
         });
 
-        const page = await browser.newPage();
-        await page.setViewport({ width: 1920, height: 1080 });
-        await page.goto(url, { waitUntil: 'networkidle2', timeout: 30000 });
-        await page.screenshot({ path: screenshotPath, fullPage: true });
-        await browser.close();
+        const imageBuffer = Buffer.from(response.data);
 
         await sock.sendMessage(context.from, {
-            image: { url: screenshotPath },
+            image: imageBuffer,
             caption: `╭━━━『 *SCREENSHOT* 』━━━╮
 │
 │ 🌐 *URL:* ${url}
@@ -65,8 +45,6 @@ const screenshot = async (sock, msg, args, context) => {
 │
 ╰━━━━━━━━━━━━━━━━━━━━╯`
         }, { quoted: msg });
-
-        fs.unlinkSync(screenshotPath);
 
         await sock.sendMessage(context.from, {
             delete: genMsg.key
