@@ -5,8 +5,7 @@ const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
 
 // Random crimes for fun
 const randomCrimes = [
-    'Him No Get Sense',
-    'Him na theif'
+    'He is a theif',
 ];
 
 // Random rewards
@@ -241,15 +240,7 @@ const wanted = async (sock, msg, args, context) => {
 
         // Send the wanted poster
         await sock.sendMessage(context.from, {
-            image: posterBuffer,
-            caption: `╭━━━『 *WANTED POSTER* 』━━━╮
-│
-│ 🚨 *Crime:* ${crime}
-│ 💰 *Reward:* ${reward}
-│
-│ ⚠️ If seen, report immediately!
-│
-╰━━━━━━━━━━━━━━━━━━━━╯`
+            image: posterBuffer
         }, { quoted: msg });
 
         // Clean up
