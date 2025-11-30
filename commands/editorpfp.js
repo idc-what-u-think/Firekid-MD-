@@ -4,13 +4,14 @@ const { createCanvas, loadImage } = require('canvas');
 const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
 const axios = require('axios');
 
-// Logo URLs (transparent PNGs)
+// Logo URLs (transparent PNGs) - UPDATE THESE WITH YOUR OWN LINKS
 const LOGOS = {
     capcut: 'https://i.imgur.com/vr2KCLT.png',
     tiktok: 'https://i.imgur.com/pn255KI.jpg',
     ae: 'https://i.imgur.com/IUNy2l0.png',
     alight: 'https://i.imgur.com/3QX2b4O.jpg',
-    am: 'https://i.imgur.com/3QX2b4O.jpg' 
+    am: 'https://i.imgur.com/3QX2b4O.jpg'
+};
 
 // Download logo from URL
 async function downloadLogo(url) {
@@ -102,6 +103,10 @@ const editorpfp = async (sock, msg, args, context) => {
 │ • Combine up to 4 logos
 │ • Transparent logo overlay
 │ • Perfect for editor profiles
+│
+│ 💡 *Note:* You need to upload
+│ logo PNGs to Imgur and update
+│ the LOGOS object in the code!
 │
 ╰━━━━━━━━━━━━━━━━━━━━╯`
             }, { quoted: msg });
