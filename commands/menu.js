@@ -11,6 +11,7 @@ const menu = async (sock, msg, args, context) => {
         month: 'long',
         day: 'numeric'
     });
+    
     const formatUptime = (seconds) => {
         const days = Math.floor(seconds / 86400);
         const hours = Math.floor((seconds % 86400) / 3600);
@@ -23,8 +24,10 @@ const menu = async (sock, msg, args, context) => {
         if (secs > 0 || result.length === 0) result.push(`${secs}s`);
         return result.join(' ');
     };
+    
     const uptime = formatUptime(process.uptime());
     const ping = Math.abs(Date.now() - (msg.messageTimestamp * 1000));
+    
     const menuText = `╭━━━『 *FIREKID XMD* 』━━━╮
 │
 │ 👤 *User:* ${user}
@@ -32,7 +35,7 @@ const menu = async (sock, msg, args, context) => {
 │ ⏰ *Time:* ${time}
 │ ⚡ *Uptime:* ${uptime}
 │ 📡 *Ping:* ${ping}ms
-│ 🔖 *Version:* 1.0.0
+│ 🔖 *Version:* 1.1.0
 │
 ╰━━━━━━━━━━━━━━━━━━━━╯
 ╭━━━『 *GENERAL* 』━━━╮
@@ -71,24 +74,34 @@ const menu = async (sock, msg, args, context) => {
 │ • vv - Reveal view once
 │ • sticker - Create sticker
 │ • toimg - Sticker to image
+│ • wanted - Create wanted poster
+│ • glitchtext - Generate glitch text
 │
 ╰━━━━━━━━━━━━━━━━━━━━╯
 ╭━━━『 *DOWNLOADER* 』━━━╮
 │
 │ • ttdownload - TikTok videos
 │ • song - Download songs
+│
+╰━━━━━━━━━━━━━━━━━━━━╯
+╭━━━『 *SEARCH & INFO* 』━━━╮
+│
+│ • anime - Search anime info
 │ • movie - Movie details
+│ • screenshot - Website screenshot
 │
 ╰━━━━━━━━━━━━━━━━━━━━╯
 ╭━━━『 *FUN & GAMES* 』━━━╮
 │
+│ • faketweet - Generate fake tweet
 │ • country - Guess the country
 │ • kill - Wasted effect
 │ • lyrics - Get song lyrics
 │ • weather - Weather info
 │ • guess - Guess the riddle
 │ • wcg - Play a word game
-│ • quiz - Play a quiz game with friends
+│ • quiz - Play a quiz game
+│ • tts - Text to speech
 │
 ╰━━━━━━━━━━━━━━━━━━━━╯
 ╭━━━『 *OWNER ONLY* 』━━━╮
@@ -97,14 +110,16 @@ const menu = async (sock, msg, args, context) => {
 │ • block - Block users
 │ • unlock - Unblock users
 │ • private - Private mode toggle
-│ • update - update commands
+│ • update - Update commands
 │ 
 ╰━━━━━━━━━━━━━━━━━━━━╯
 ┏━━━━━━━━━━━━━━━━━━━┓
 ┃ *Made with 🔥 by Firekid*
 ┗━━━━━━━━━━━━━━━━━━━┛`;
+
     return await sock.sendMessage(context.from, { text: menuText });
 };
+
 module.exports = {
     command: 'menu',
     handler: menu
