@@ -64,9 +64,9 @@ async function createGlitchImage(text1, text2) {
 
     // Background gradient
     const gradient = ctx.createLinearGradient(0, 0, width, height);
-    gradient.addColorStop(0, '#0a0a0a');
-    gradient.addColorStop(0.5, '#1a0a2e');
-    gradient.addColorStop(1, '#0a0a0a');
+    gradient.addColorStop(0, '#0f0f23');
+    gradient.addColorStop(0.5, '#1a1a2e');
+    gradient.addColorStop(1, '#0f0f23');
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, width, height);
 
