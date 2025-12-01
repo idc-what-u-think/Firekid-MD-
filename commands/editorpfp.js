@@ -1,5 +1,5 @@
-const axios = require('axios');
 const Jimp = require('jimp');
+const axios = require('axios');
 const path = require('path');
 const fs = require('fs');
 const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
@@ -16,7 +16,7 @@ const LOGOS = {
 async function createEditorPFP(userImageBuffer, logoNames) {
     // Load base image
     const baseImage = await Jimp.read(userImageBuffer);
-    baseImage.resize(1000, 1000);
+    await baseImage.resize(1000, 1000);
 
     // Logo positions
     const positions = [
@@ -34,12 +34,12 @@ async function createEditorPFP(userImageBuffer, logoNames) {
             const logo = await Jimp.read(logoResponse.data);
             
             // Resize and set opacity
-            logo.resize(200, 200);
-            logo.opacity(0.7);
+            await logo.resize(200, 200);
+            await logo.opacity(0.7);
             
             // Composite logo on base image
             const pos = positions[i];
-            baseImage.composite(logo, pos.x, pos.y);
+            await baseImage.composite(logo, pos.x, pos.y);
         } catch (logoError) {
             console.error(`Failed to load logo ${logoNames[i]}:`, logoError.message);
         }
