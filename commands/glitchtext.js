@@ -1,6 +1,4 @@
-const { createCanvas, registerFont } = require('canvas');
-const fs = require('fs');
-const path = require('path');
+const Jimp = require('jimp');
 
 // Zalgo characters for glitch effect
 const zalgoUp = [
@@ -27,17 +25,16 @@ const zalgoDown = [
     '\u034e', '\u0353', '\u0354', '\u0355', '\u0356', '\u0359', '\u035a', '\u0323'
 ];
 
-// Generate zalgo glitch text
 function generateZalgoText(text, intensity = 'medium') {
-    let levels = { low: 5, medium: 10, high: 15, extreme: 25 };
-    let maxMarks = levels[intensity] || 10;
+    const levels = { low: 5, medium: 10, high: 15, extreme: 25 };
+    const maxMarks = levels[intensity] || 10;
     
     let result = '';
     
     for (let char of text) {
         result += char;
         
-        let numMarks = Math.floor(Math.random() * maxMarks) + 1;
+        const numMarks = Math.floor(Math.random() * maxMarks) + 1;
         
         for (let i = 0; i < numMarks; i++) {
             const position = Math.random();
@@ -55,102 +52,211 @@ function generateZalgoText(text, intensity = 'medium') {
     return result;
 }
 
-// Create glitch text image with canvas
 async function createGlitchImage(text1, text2) {
-    const width = 1200;
-    const height = 600;
-    const canvas = createCanvas(width, height);
-    const ctx = canvas.getContext('2d');
-
-    // Background gradient
-    const gradient = ctx.createLinearGradient(0, 0, width, height);
-    gradient.addColorStop(0, '#0f0f23');
-    gradient.addColorStop(0.5, '#1a1a2e');
-    gradient.addColorStop(1, '#0f0f23');
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, width, height);
-
-    // Add noise effect
-    for (let i = 0; i < 3000; i++) {
-        const x = Math.random() * width;
-        const y = Math.random() * height;
-        const opacity = Math.random() * 0.3;
-        ctx.fillStyle = `rgba(255, 255, 255, ${opacity})`;
-        ctx.fillRect(x, y, 2, 2);
-    }
-
-    // Text settings
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-
-    // First text (top)
-    const fontSize1 = 100;
-    ctx.font = `bold ${fontSize1}px Arial`;
-    
-    // Glitch effect layers for text 1
-    ctx.fillStyle = '#ff00ff';
-    ctx.fillText(text1, width/2 - 4, height/2 - 80);
-    
-    ctx.fillStyle = '#00ffff';
-    ctx.fillText(text1, width/2 + 4, height/2 - 80);
-    
-    ctx.fillStyle = '#ffffff';
-    ctx.fillText(text1, width/2, height/2 - 80);
-
-    // Second text (bottom)
-    if (text2) {
-        const fontSize2 = 100;
-        ctx.font = `bold ${fontSize2}px Arial`;
+    try {
+        const width = 1200;
+        const height = 600;
         
-        ctx.fillStyle = '#ff00ff';
-        ctx.fillText(text2, width/2 - 4, height/2 + 80);
+        // Create base image with dark gradient background
+        const image = new Jimp(width, height, 0x0f0f23ff);
         
-        ctx.fillStyle = '#00ffff';
-        ctx.fillText(text2, width/2 + 4, height/2 + 80);
+        // Create gradient effect
+        image.scan(0, 0, width, height, function(x, y, idx) {
+            const gradientFactor = y / height;
+            const r = Math.floor(15 + gradientFactor * (26 - 15));
+            const g = Math.floor(15 + gradientFactor * (26 - 15));
+            const b = Math.floor(35 + gradientFactor * (46 - 35));
+            
+            this.bitmap.data[idx] = r;
+            this.bitmap.data[idx + 1] = g;
+            this.bitmap.data[idx + 2] = b;
+            this.bitmap.data[idx + 3] = 255;
+        });
         
-        ctx.fillStyle = '#ffffff';
-        ctx.fillText(text2, width/2, height/2 + 80);
+        // Add heavy noise/static effect for glitch look
+        image.scan(0, 0, width, height, function(x, y, idx) {
+            if (Math.random() > 0.92) {
+                const brightness = Math.floor(Math.random() * 150);
+                this.bitmap.data[idx] = brightness;
+                this.bitmap.data[idx + 1] = brightness;
+                this.bitmap.data[idx + 2] = brightness;
+            }
+        });
+        
+        // Add random glitch bars
+        for (let i = 0; i < 20; i++) {
+            const barY = Math.floor(Math.random() * height);
+            const barHeight = Math.floor(Math.random() * 5) + 1;
+            const barColor = Math.random() > 0.5 ? 0xff00ffff : 0x00ffffff;
+            
+            image.scan(0, barY, width, barHeight, function(x, y, idx) {
+                const r = (barColor >> 24) & 0xff;
+                const g = (barColor >> 16) & 0xff;
+                const b = (barColor >> 8) & 0xff;
+                
+                this.bitmap.data[idx] = r;
+                this.bitmap.data[idx + 1] = g;
+                this.bitmap.data[idx + 2] = b;
+                this.bitmap.data[idx + 3] = Math.floor(Math.random() * 100) + 50;
+            });
+        }
+        
+        // Load fonts
+        const font128 = await Jimp.loadFont(Jimp.FONT_SANS_128_WHITE);
+        const font64 = await Jimp.loadFont(Jimp.FONT_SANS_64_WHITE);
+        
+        // Create RGB split glitch effect for text
+        const offsetX = 6;
+        
+        // Print text with chromatic aberration effect
+        if (text1) {
+            const y1 = text2 ? height / 2 - 80 : height / 2 - 64;
+            
+            // Cyan/Blue layer (offset left)
+            const cyanLayer = image.clone();
+            cyanLayer.print(font128, 0, y1, {
+                text: text1,
+                alignmentX: Jimp.HORIZONTAL_ALIGN_CENTER
+            }, width);
+            
+            // Tint cyan layer
+            cyanLayer.scan(0, 0, width, height, function(x, y, idx) {
+                if (this.bitmap.data[idx] > 200) {
+                    this.bitmap.data[idx] = 0;
+                    this.bitmap.data[idx + 1] = 255;
+                    this.bitmap.data[idx + 2] = 255;
+                }
+            });
+            
+            image.composite(cyanLayer, -offsetX, 0, {
+                mode: Jimp.BLEND_ADD,
+                opacitySource: 0.7
+            });
+            
+            // Magenta/Red layer (offset right)
+            const magentaLayer = image.clone();
+            magentaLayer.print(font128, 0, y1, {
+                text: text1,
+                alignmentX: Jimp.HORIZONTAL_ALIGN_CENTER
+            }, width);
+            
+            magentaLayer.scan(0, 0, width, height, function(x, y, idx) {
+                if (this.bitmap.data[idx] > 200) {
+                    this.bitmap.data[idx] = 255;
+                    this.bitmap.data[idx + 1] = 0;
+                    this.bitmap.data[idx + 2] = 255;
+                }
+            });
+            
+            image.composite(magentaLayer, offsetX, 0, {
+                mode: Jimp.BLEND_ADD,
+                opacitySource: 0.7
+            });
+            
+            // White center layer
+            image.print(font128, 0, y1, {
+                text: text1,
+                alignmentX: Jimp.HORIZONTAL_ALIGN_CENTER
+            }, width);
+        }
+        
+        if (text2) {
+            const y2 = height / 2 + 50;
+            
+            // Same RGB split for second text
+            const cyanLayer2 = image.clone();
+            cyanLayer2.print(font64, 0, y2, {
+                text: text2,
+                alignmentX: Jimp.HORIZONTAL_ALIGN_CENTER
+            }, width);
+            
+            cyanLayer2.scan(0, 0, width, height, function(x, y, idx) {
+                if (this.bitmap.data[idx] > 200) {
+                    this.bitmap.data[idx] = 0;
+                    this.bitmap.data[idx + 1] = 255;
+                    this.bitmap.data[idx + 2] = 255;
+                }
+            });
+            
+            image.composite(cyanLayer2, -offsetX, 0, {
+                mode: Jimp.BLEND_ADD,
+                opacitySource: 0.7
+            });
+            
+            const magentaLayer2 = image.clone();
+            magentaLayer2.print(font64, 0, y2, {
+                text: text2,
+                alignmentX: Jimp.HORIZONTAL_ALIGN_CENTER
+            }, width);
+            
+            magentaLayer2.scan(0, 0, width, height, function(x, y, idx) {
+                if (this.bitmap.data[idx] > 200) {
+                    this.bitmap.data[idx] = 255;
+                    this.bitmap.data[idx + 1] = 0;
+                    this.bitmap.data[idx + 2] = 255;
+                }
+            });
+            
+            image.composite(magentaLayer2, offsetX, 0, {
+                mode: Jimp.BLEND_ADD,
+                opacitySource: 0.7
+            });
+            
+            image.print(font64, 0, y2, {
+                text: text2,
+                alignmentX: Jimp.HORIZONTAL_ALIGN_CENTER
+            }, width);
+        }
+        
+        // Add scan lines effect
+        for (let y = 0; y < height; y += 4) {
+            image.scan(0, y, width, 2, function(x, y, idx) {
+                this.bitmap.data[idx] = Math.max(0, this.bitmap.data[idx] - 30);
+                this.bitmap.data[idx + 1] = Math.max(0, this.bitmap.data[idx + 1] - 30);
+                this.bitmap.data[idx + 2] = Math.max(0, this.bitmap.data[idx + 2] - 30);
+            });
+        }
+        
+        // Add random pixel corruption for more glitch
+        image.scan(0, 0, width, height, function(x, y, idx) {
+            if (Math.random() > 0.995) {
+                this.bitmap.data[idx] = Math.floor(Math.random() * 255);
+                this.bitmap.data[idx + 1] = Math.floor(Math.random() * 255);
+                this.bitmap.data[idx + 2] = Math.floor(Math.random() * 255);
+            }
+        });
+        
+        return await image.getBufferAsync(Jimp.MIME_PNG);
+    } catch (error) {
+        throw new Error(`Failed to create glitch image: ${error.message}`);
     }
-
-    // Scan lines effect
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
-    ctx.lineWidth = 2;
-    for (let i = 0; i < height; i += 4) {
-        ctx.beginPath();
-        ctx.moveTo(0, i);
-        ctx.lineTo(width, i);
-        ctx.stroke();
-    }
-
-    return canvas.toBuffer('image/png');
 }
 
 const glitchtext = async (sock, msg, args, context) => {
     try {
         if (args.length === 0) {
             return await sock.sendMessage(context.from, {
-                text: `╭━━━『 *GLITCH TEXT* 』━━━╮
-│
-│ ⚠️ *Usage:*
-│ .glitchtext [text]
-│ .glitchtext [text1], [text2]
-│
-│ 📝 *Examples:*
-│ .glitchtext Firekid XMD
-│ .glitchtext Firekid, XMD
-│ .glitchtext Hello World
-│
-│ 🎨 *Features:*
-│ • Zalgo text effect
-│ • Glitch image with RGB split
-│ • Cyberpunk aesthetic
-│
-╰━━━━━━━━━━━━━━━━━━━━╯`
+                text: `GLITCH TEXT GENERATOR
+
+Usage:
+.glitchtext [text]
+.glitchtext [text1], [text2]
+
+Examples:
+.glitchtext Firekid XMD
+.glitchtext Firekid, XMD
+.glitchtext Hello World
+
+Features:
+• Zalgo text effect
+• Glitch image with RGB split
+• Cyberpunk aesthetic
+• Scan lines and noise`
             }, { quoted: msg });
         }
 
         const genMsg = await sock.sendMessage(context.from, {
-            text: '⚡ *Generating glitch text...*'
+            text: 'Generating glitch text...'
         }, { quoted: msg });
 
         const fullText = args.join(' ');
@@ -171,39 +277,29 @@ const glitchtext = async (sock, msg, args, context) => {
         const zalgoText2 = text2 ? generateZalgoText(text2, 'high') : '';
 
         // Create glitch image
-        const tmpDir = path.join(process.cwd(), 'tmp');
-        if (!fs.existsSync(tmpDir)) {
-            fs.mkdirSync(tmpDir, { recursive: true });
-        }
-
         const imageBuffer = await createGlitchImage(text1, text2);
 
         // Send zalgo text
         const zalgoMessage = text2 
-            ? `${zalgoText1}\n${zalgoText2}`
+            ? `${zalgoText1}\n\n${zalgoText2}`
             : zalgoText1;
 
         await sock.sendMessage(context.from, {
-            text: `╭━━━『 *GLITCH TEXT* 』━━━╮
-│
-${zalgoMessage}
-│
-╰━━━━━━━━━━━━━━━━━━━━╯`
+            text: `GLITCH TEXT\n\n${zalgoMessage}\n\nOriginal: ${text1}${text2 ? ' / ' + text2 : ''}`
         }, { quoted: msg });
 
         // Send glitch image
         await sock.sendMessage(context.from, {
-            image: imageBuffer
+            image: imageBuffer,
+            caption: 'Glitch Image'
         }, { quoted: msg });
 
-        await sock.sendMessage(context.from, {
-            delete: genMsg.key
-        });
+        await sock.sendMessage(context.from, { delete: genMsg.key });
 
     } catch (error) {
         console.error('Error in glitchtext command:', error);
         await sock.sendMessage(context.from, {
-            text: `❌ *Failed to generate glitch text*\n\n${error.message}`
+            text: `Failed to generate glitch text\n\n${error.message}`
         }, { quoted: msg });
     }
 };
