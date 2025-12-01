@@ -107,16 +107,16 @@ async function generateFakeTweet(celebrity, message) {
         const height = 800;
         
         // Create white background
-        const image = new Jimp(width, height, '#FFFFFF');
+        const image = await new Jimp(width, height, 0xFFFFFFFF);
         
         // Load and draw avatar
         let avatar;
         try {
             const response = await axios.get(celebrity.avatar, { responseType: 'arraybuffer' });
             avatar = await Jimp.read(response.data);
-            avatar.resize(96, 96);
-            avatar.circle();
-            image.composite(avatar, 72, 72);
+            await avatar.resize(96, 96);
+            await avatar.circle();
+            await image.composite(avatar, 72, 72);
         } catch (error) {
             console.error('Failed to load avatar:', error.message);
         }
@@ -127,24 +127,24 @@ async function generateFakeTweet(celebrity, message) {
         const font64 = await Jimp.loadFont(Jimp.FONT_SANS_64_BLACK);
         
         // Draw name
-        image.print(font32, 190, 80, celebrity.name);
+        await image.print(font32, 190, 80, celebrity.name);
         
         // Draw handle
-        image.print(font16, 190, 120, `@${celebrity.handle}`, 800);
+        await image.print(font16, 190, 120, `@${celebrity.handle}`, 800);
         
         // Draw tweet text
-        image.print(font64, 100, 200, message, 1000);
+        await image.print(font64, 100, 200, message, 1000);
         
         // Draw time
-        image.print(font16, 100, height - 300, getCurrentTime());
+        await image.print(font16, 100, height - 300, getCurrentTime());
         
         // Draw engagement stats
         const engagement = getRandomEngagement();
         const stats = `${formatNumber(engagement.retweets)} Retweets  ${formatNumber(engagement.quotes)} Quotes  ${formatNumber(engagement.likes)} Likes`;
-        image.print(font16, 100, height - 200, stats);
+        await image.print(font16, 100, height - 200, stats);
         
         const views = `${formatNumber(engagement.views)} Views`;
-        image.print(font16, 100, height - 150, views);
+        await image.print(font16, 100, height - 150, views);
         
         return await image.getBufferAsync(Jimp.MIME_PNG);
     } catch (error) {
