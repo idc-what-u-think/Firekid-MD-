@@ -58,10 +58,10 @@ async function createGlitchImage(text1, text2) {
         const height = 600;
         
         // Create base image with dark gradient background
-        const image = new Jimp(width, height, 0x0f0f23ff);
+        const image = await new Jimp(width, height, 0x0f0f23ff);
         
         // Create gradient effect
-        image.scan(0, 0, width, height, function(x, y, idx) {
+        await image.scan(0, 0, width, height, function(x, y, idx) {
             const gradientFactor = y / height;
             const r = Math.floor(15 + gradientFactor * (26 - 15));
             const g = Math.floor(15 + gradientFactor * (26 - 15));
@@ -74,7 +74,7 @@ async function createGlitchImage(text1, text2) {
         });
         
         // Add heavy noise/static effect for glitch look
-        image.scan(0, 0, width, height, function(x, y, idx) {
+        await image.scan(0, 0, width, height, function(x, y, idx) {
             if (Math.random() > 0.92) {
                 const brightness = Math.floor(Math.random() * 150);
                 this.bitmap.data[idx] = brightness;
@@ -89,7 +89,7 @@ async function createGlitchImage(text1, text2) {
             const barHeight = Math.floor(Math.random() * 5) + 1;
             const barColor = Math.random() > 0.5 ? 0xff00ffff : 0x00ffffff;
             
-            image.scan(0, barY, width, barHeight, function(x, y, idx) {
+            await image.scan(0, barY, width, barHeight, function(x, y, idx) {
                 const r = (barColor >> 24) & 0xff;
                 const g = (barColor >> 16) & 0xff;
                 const b = (barColor >> 8) & 0xff;
@@ -113,14 +113,14 @@ async function createGlitchImage(text1, text2) {
             const y1 = text2 ? height / 2 - 80 : height / 2 - 64;
             
             // Cyan/Blue layer (offset left)
-            const cyanLayer = image.clone();
-            cyanLayer.print(font128, 0, y1, {
+            const cyanLayer = await image.clone();
+            await cyanLayer.print(font128, 0, y1, {
                 text: text1,
                 alignmentX: Jimp.HORIZONTAL_ALIGN_CENTER
             }, width);
             
             // Tint cyan layer
-            cyanLayer.scan(0, 0, width, height, function(x, y, idx) {
+            await cyanLayer.scan(0, 0, width, height, function(x, y, idx) {
                 if (this.bitmap.data[idx] > 200) {
                     this.bitmap.data[idx] = 0;
                     this.bitmap.data[idx + 1] = 255;
@@ -128,19 +128,19 @@ async function createGlitchImage(text1, text2) {
                 }
             });
             
-            image.composite(cyanLayer, -offsetX, 0, {
+            await image.composite(cyanLayer, -offsetX, 0, {
                 mode: Jimp.BLEND_ADD,
                 opacitySource: 0.7
             });
             
             // Magenta/Red layer (offset right)
-            const magentaLayer = image.clone();
-            magentaLayer.print(font128, 0, y1, {
+            const magentaLayer = await image.clone();
+            await magentaLayer.print(font128, 0, y1, {
                 text: text1,
                 alignmentX: Jimp.HORIZONTAL_ALIGN_CENTER
             }, width);
             
-            magentaLayer.scan(0, 0, width, height, function(x, y, idx) {
+            await magentaLayer.scan(0, 0, width, height, function(x, y, idx) {
                 if (this.bitmap.data[idx] > 200) {
                     this.bitmap.data[idx] = 255;
                     this.bitmap.data[idx + 1] = 0;
@@ -148,13 +148,13 @@ async function createGlitchImage(text1, text2) {
                 }
             });
             
-            image.composite(magentaLayer, offsetX, 0, {
+            await image.composite(magentaLayer, offsetX, 0, {
                 mode: Jimp.BLEND_ADD,
                 opacitySource: 0.7
             });
             
             // White center layer
-            image.print(font128, 0, y1, {
+            await image.print(font128, 0, y1, {
                 text: text1,
                 alignmentX: Jimp.HORIZONTAL_ALIGN_CENTER
             }, width);
@@ -164,13 +164,13 @@ async function createGlitchImage(text1, text2) {
             const y2 = height / 2 + 50;
             
             // Same RGB split for second text
-            const cyanLayer2 = image.clone();
-            cyanLayer2.print(font64, 0, y2, {
+            const cyanLayer2 = await image.clone();
+            await cyanLayer2.print(font64, 0, y2, {
                 text: text2,
                 alignmentX: Jimp.HORIZONTAL_ALIGN_CENTER
             }, width);
             
-            cyanLayer2.scan(0, 0, width, height, function(x, y, idx) {
+            await cyanLayer2.scan(0, 0, width, height, function(x, y, idx) {
                 if (this.bitmap.data[idx] > 200) {
                     this.bitmap.data[idx] = 0;
                     this.bitmap.data[idx + 1] = 255;
@@ -178,18 +178,18 @@ async function createGlitchImage(text1, text2) {
                 }
             });
             
-            image.composite(cyanLayer2, -offsetX, 0, {
+            await image.composite(cyanLayer2, -offsetX, 0, {
                 mode: Jimp.BLEND_ADD,
                 opacitySource: 0.7
             });
             
-            const magentaLayer2 = image.clone();
-            magentaLayer2.print(font64, 0, y2, {
+            const magentaLayer2 = await image.clone();
+            await magentaLayer2.print(font64, 0, y2, {
                 text: text2,
                 alignmentX: Jimp.HORIZONTAL_ALIGN_CENTER
             }, width);
             
-            magentaLayer2.scan(0, 0, width, height, function(x, y, idx) {
+            await magentaLayer2.scan(0, 0, width, height, function(x, y, idx) {
                 if (this.bitmap.data[idx] > 200) {
                     this.bitmap.data[idx] = 255;
                     this.bitmap.data[idx + 1] = 0;
@@ -197,12 +197,12 @@ async function createGlitchImage(text1, text2) {
                 }
             });
             
-            image.composite(magentaLayer2, offsetX, 0, {
+            await image.composite(magentaLayer2, offsetX, 0, {
                 mode: Jimp.BLEND_ADD,
                 opacitySource: 0.7
             });
             
-            image.print(font64, 0, y2, {
+            await image.print(font64, 0, y2, {
                 text: text2,
                 alignmentX: Jimp.HORIZONTAL_ALIGN_CENTER
             }, width);
@@ -210,7 +210,7 @@ async function createGlitchImage(text1, text2) {
         
         // Add scan lines effect
         for (let y = 0; y < height; y += 4) {
-            image.scan(0, y, width, 2, function(x, y, idx) {
+            await image.scan(0, y, width, 2, function(x, y, idx) {
                 this.bitmap.data[idx] = Math.max(0, this.bitmap.data[idx] - 30);
                 this.bitmap.data[idx + 1] = Math.max(0, this.bitmap.data[idx + 1] - 30);
                 this.bitmap.data[idx + 2] = Math.max(0, this.bitmap.data[idx + 2] - 30);
@@ -218,7 +218,7 @@ async function createGlitchImage(text1, text2) {
         }
         
         // Add random pixel corruption for more glitch
-        image.scan(0, 0, width, height, function(x, y, idx) {
+        await image.scan(0, 0, width, height, function(x, y, idx) {
             if (Math.random() > 0.995) {
                 this.bitmap.data[idx] = Math.floor(Math.random() * 255);
                 this.bitmap.data[idx + 1] = Math.floor(Math.random() * 255);
