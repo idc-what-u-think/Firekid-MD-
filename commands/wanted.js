@@ -2,7 +2,7 @@ const Jimp = require('jimp');
 const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
 
 const randomCrimes = [
-    'He is A theif',
+    'Theif',
 ];
 
 const randomRewards = [
@@ -23,10 +23,10 @@ async function createWantedPoster(imageBuffer, crime, reward) {
         const height = 1600;
         
         // Create aged paper background
-        const poster = new Jimp(width, height, '#E8D5B7');
+        const poster = await new Jimp(width, height, 0xE8D5B7FF);
         
         // Add noise texture for aged look
-        poster.scan(0, 0, width, height, function(x, y, idx) {
+        await poster.scan(0, 0, width, height, function(x, y, idx) {
             if (Math.random() > 0.95) {
                 this.bitmap.data[idx] = Math.max(0, this.bitmap.data[idx] - 30);
                 this.bitmap.data[idx + 1] = Math.max(0, this.bitmap.data[idx + 1] - 30);
@@ -40,22 +40,22 @@ async function createWantedPoster(imageBuffer, crime, reward) {
         const font32 = await Jimp.loadFont(Jimp.FONT_SANS_32_BLACK);
         
         // Draw "WANTED" header
-        poster.print(font128, 0, 50, {
+        await poster.print(font128, 0, 50, {
             text: 'WANTED',
             alignmentX: Jimp.HORIZONTAL_ALIGN_CENTER
         }, width);
         
         // Draw "DEAD OR ALIVE" subtitle
-        poster.print(font64, 0, 220, {
+        await poster.print(font64, 0, 220, {
             text: 'DEAD OR ALIVE',
             alignmentX: Jimp.HORIZONTAL_ALIGN_CENTER
         }, width);
         
         // Load and process user image
         const userImage = await Jimp.read(imageBuffer);
-        userImage.resize(700, 700);
-        userImage.sepia();
-        userImage.contrast(0.2);
+        await userImage.resize(700, 700);
+        await userImage.sepia();
+        await userImage.contrast(0.2);
         
         // Create white border for image
         const borderSize = 10;
@@ -63,35 +63,35 @@ async function createWantedPoster(imageBuffer, crime, reward) {
         const imgY = 320;
         
         // Draw white background for border
-        poster.scan(imgX - borderSize, imgY - borderSize, 720, 720, function(x, y, idx) {
+        await poster.scan(imgX - borderSize, imgY - borderSize, 720, 720, function(x, y, idx) {
             this.bitmap.data[idx] = 255;
             this.bitmap.data[idx + 1] = 255;
             this.bitmap.data[idx + 2] = 255;
         });
         
         // Composite user image
-        poster.composite(userImage, imgX, imgY);
+        await poster.composite(userImage, imgX, imgY);
         
         // Draw "WANTED FOR:" text
-        poster.print(font64, 0, 1080, {
+        await poster.print(font64, 0, 1080, {
             text: 'WANTED FOR:',
             alignmentX: Jimp.HORIZONTAL_ALIGN_CENTER
         }, width);
         
         // Draw crime
-        poster.print(font64, 100, 1180, {
+        await poster.print(font64, 100, 1180, {
             text: crime,
             alignmentX: Jimp.HORIZONTAL_ALIGN_CENTER
         }, width - 200);
         
         // Draw "REWARD" text
-        poster.print(font64, 0, 1320, {
+        await poster.print(font64, 0, 1320, {
             text: 'REWARD',
             alignmentX: Jimp.HORIZONTAL_ALIGN_CENTER
         }, width);
         
         // Draw reward amount
-        poster.print(font128, 0, 1400, {
+        await poster.print(font128, 0, 1400, {
             text: reward,
             alignmentX: Jimp.HORIZONTAL_ALIGN_CENTER
         }, width);
