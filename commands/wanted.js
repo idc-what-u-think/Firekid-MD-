@@ -2,11 +2,7 @@ const Jimp = require('jimp');
 const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
 
 const randomCrimes = [
-    'Being too cool',
-    'Stealing hearts',
-    'Breaking the internet',
-    'Excessive swag',
-    'Being legendary'
+    'He is A theif',
 ];
 
 const randomRewards = [
