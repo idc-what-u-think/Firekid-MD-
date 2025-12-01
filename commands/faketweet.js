@@ -1,7 +1,7 @@
-const { createCanvas, loadImage, registerFont } = require('canvas');
+const Jimp = require('jimp');
 const axios = require('axios');
 
-// Celebrity database with Twitter handles and profile data
+// Celebrity database
 const celebrities = {
     'ronaldo': { 
         name: 'Cristiano Ronaldo', 
@@ -65,27 +65,6 @@ const celebrities = {
     }
 };
 
-// Function to wrap text for canvas
-function wrapText(context, text, maxWidth) {
-    const words = text.split(' ');
-    const lines = [];
-    let currentLine = words[0];
-
-    for (let i = 1; i < words.length; i++) {
-        const word = words[i];
-        const width = context.measureText(currentLine + " " + word).width;
-        if (width < maxWidth) {
-            currentLine += " " + word;
-        } else {
-            lines.push(currentLine);
-            currentLine = word;
-        }
-    }
-    lines.push(currentLine);
-    return lines;
-}
-
-// Function to format numbers (1234 -> 1.2K)
 function formatNumber(num) {
     if (num >= 1000000) {
         return (num / 1000000).toFixed(1) + 'M';
@@ -96,7 +75,6 @@ function formatNumber(num) {
     return num.toString();
 }
 
-// Generate random engagement numbers
 function getRandomEngagement() {
     return {
         retweets: Math.floor(Math.random() * 50000) + 1000,
@@ -106,7 +84,6 @@ function getRandomEngagement() {
     };
 }
 
-// Get current time
 function getCurrentTime() {
     const now = new Date();
     let hours = now.getHours();
@@ -124,171 +101,77 @@ function getCurrentTime() {
     return `${hours}:${minutesStr} ${ampm} · ${month} ${day}, ${year}`;
 }
 
-// Main function to generate fake tweet
 async function generateFakeTweet(celebrity, message) {
     try {
-        // Canvas dimensions matching Twitter's layout
         const width = 1200;
         const height = 800;
-        const canvas = createCanvas(width, height);
-        const ctx = canvas.getContext('2d');
-
-        // Background - White (Twitter light theme)
-        ctx.fillStyle = '#FFFFFF';
-        ctx.fillRect(0, 0, width, height);
-
-        // Load avatar
+        
+        // Create white background
+        const image = new Jimp(width, height, '#FFFFFF');
+        
+        // Load and draw avatar
         let avatar;
         try {
             const response = await axios.get(celebrity.avatar, { responseType: 'arraybuffer' });
-            avatar = await loadImage(Buffer.from(response.data));
+            avatar = await Jimp.read(response.data);
+            avatar.resize(96, 96);
+            avatar.circle();
+            image.composite(avatar, 72, 72);
         } catch (error) {
-            // Fallback: draw a circle if avatar fails
-            ctx.fillStyle = '#1DA1F2';
-            ctx.beginPath();
-            ctx.arc(120, 120, 48, 0, Math.PI * 2);
-            ctx.fill();
+            console.error('Failed to load avatar:', error.message);
         }
-
-        // Draw avatar
-        if (avatar) {
-            ctx.save();
-            ctx.beginPath();
-            ctx.arc(120, 120, 48, 0, Math.PI * 2);
-            ctx.closePath();
-            ctx.clip();
-            ctx.drawImage(avatar, 72, 72, 96, 96);
-            ctx.restore();
-        }
-
+        
+        // Load font
+        const font32 = await Jimp.loadFont(Jimp.FONT_SANS_32_BLACK);
+        const font16 = await Jimp.loadFont(Jimp.FONT_SANS_16_BLACK);
+        const font64 = await Jimp.loadFont(Jimp.FONT_SANS_64_BLACK);
+        
         // Draw name
-        ctx.fillStyle = '#0F1419';
-        ctx.font = 'bold 32px Arial';
-        ctx.fillText(celebrity.name, 190, 95);
-
-        // Draw verified badge if verified
-        if (celebrity.verified) {
-            ctx.fillStyle = '#1D9BF0';
-            ctx.beginPath();
-            ctx.arc(190 + ctx.measureText(celebrity.name).width + 15, 85, 12, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.fillStyle = '#000000';
-            ctx.font = 'bold 16px Arial';
-            ctx.fillText('✓', 190 + ctx.measureText(celebrity.name).width + 10, 92);
-        }
-
+        image.print(font32, 190, 80, celebrity.name);
+        
         // Draw handle
-        ctx.fillStyle = '#536471';
-        ctx.font = '28px Arial';
-        ctx.fillText(`@${celebrity.handle}`, 190, 130);
-
+        image.print(font16, 190, 120, `@${celebrity.handle}`, 800);
+        
         // Draw tweet text
-        ctx.fillStyle = '#0F1419';
-        ctx.font = '36px Arial';
-        const lines = wrapText(ctx, message, width - 200);
-        let yPosition = 200;
-        lines.forEach(line => {
-            ctx.fillText(line, 100, yPosition);
-            yPosition += 50;
-        });
-
+        image.print(font64, 100, 200, message, 1000);
+        
         // Draw time
-        yPosition += 30;
-        ctx.fillStyle = '#536471';
-        ctx.font = '28px Arial';
-        ctx.fillText(getCurrentTime(), 100, yPosition);
-        ctx.fillText(' · ', 100 + ctx.measureText(getCurrentTime()).width, yPosition);
+        image.print(font16, 100, height - 300, getCurrentTime());
         
-        // Draw "X for iPhone"
-        ctx.fillStyle = '#1D9BF0';
-        ctx.fillText('𝕏 for iPhone', 100 + ctx.measureText(getCurrentTime() + ' · ').width, yPosition);
-
-        // Divider line
-        yPosition += 40;
-        ctx.strokeStyle = '#EFF3F4';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(100, yPosition);
-        ctx.lineTo(width - 100, yPosition);
-        ctx.stroke();
-
-        // Engagement stats
+        // Draw engagement stats
         const engagement = getRandomEngagement();
-        yPosition += 50;
-        ctx.fillStyle = '#0F1419';
-        ctx.font = 'bold 28px Arial';
+        const stats = `${formatNumber(engagement.retweets)} Retweets  ${formatNumber(engagement.quotes)} Quotes  ${formatNumber(engagement.likes)} Likes`;
+        image.print(font16, 100, height - 200, stats);
         
-        let xPos = 100;
-        ctx.fillText(formatNumber(engagement.retweets), xPos, yPosition);
-        ctx.fillStyle = '#536471';
-        ctx.font = '28px Arial';
-        xPos += ctx.measureText(formatNumber(engagement.retweets)).width + 10;
-        ctx.fillText('Retweets', xPos, yPosition);
+        const views = `${formatNumber(engagement.views)} Views`;
+        image.print(font16, 100, height - 150, views);
         
-        xPos += ctx.measureText('Retweets').width + 40;
-        ctx.fillStyle = '#0F1419';
-        ctx.font = 'bold 28px Arial';
-        ctx.fillText(formatNumber(engagement.quotes), xPos, yPosition);
-        ctx.fillStyle = '#536471';
-        ctx.font = '28px Arial';
-        xPos += ctx.measureText(formatNumber(engagement.quotes)).width + 10;
-        ctx.fillText('Quotes', xPos, yPosition);
-        
-        xPos += ctx.measureText('Quotes').width + 40;
-        ctx.fillStyle = '#0F1419';
-        ctx.font = 'bold 28px Arial';
-        ctx.fillText(formatNumber(engagement.likes), xPos, yPosition);
-        ctx.fillStyle = '#536471';
-        ctx.font = '28px Arial';
-        xPos += ctx.measureText(formatNumber(engagement.likes)).width + 10;
-        ctx.fillText('Likes', xPos, yPosition);
-
-        // Views
-        yPosition += 50;
-        ctx.fillStyle = '#536471';
-        ctx.font = '26px Arial';
-        ctx.fillText(`${formatNumber(engagement.views)} Views`, 100, yPosition);
-
-        // Another divider
-        yPosition += 30;
-        ctx.strokeStyle = '#EFF3F4';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(100, yPosition);
-        ctx.lineTo(width - 100, yPosition);
-        ctx.stroke();
-
-        return canvas.toBuffer('image/png');
+        return await image.getBufferAsync(Jimp.MIME_PNG);
     } catch (error) {
         throw new Error(`Failed to generate tweet: ${error.message}`);
     }
 }
 
-// Main command handler
 const faketweet = async (sock, msg, args, context) => {
     try {
-        // Check if user provided celebrity and message
         if (args.length < 2) {
             await sock.sendMessage(context.from, {
-                text: `╭━━━『 *FAKE TWEET USAGE* 』━━━╮
-│
-│ ⚠️ *How to use:*
-│ .faketweet [celebrity] [message]
-│
-│ 📝 *Example:*
-│ .faketweet ronaldo Siuuuu! 🐐
-│
-│ 👥 *Available Celebrities:*
-│ • ronaldo • messi
-│ • elon • trump
-│ • drake • rihanna
-│ • beyonce • kim
-│ • kanye • lebron
-│
-│ ⚠️ *Note:* Generated tweets are
-│ clearly marked as FAKE.
-│
-╰━━━━━━━━━━━━━━━━━━━━╯`
+                text: `FAKE TWEET GENERATOR
+
+How to use:
+.faketweet [celebrity] [message]
+
+Example:
+.faketweet ronaldo Siuuuu!
+
+Available Celebrities:
+• ronaldo • messi
+• elon • trump
+• drake • rihanna
+• beyonce • kim
+• kanye • lebron
+
+Note: Generated tweets are clearly fake`
             });
             return;
         }
@@ -296,37 +179,31 @@ const faketweet = async (sock, msg, args, context) => {
         const celebrityName = args[0].toLowerCase();
         const message = args.slice(1).join(' ');
 
-        // Check if celebrity exists
         if (!celebrities[celebrityName]) {
             await sock.sendMessage(context.from, {
-                text: `❌ Celebrity "${celebrityName}" not found!\n\n👥 Available: ${Object.keys(celebrities).join(', ')}`
+                text: `Celebrity not found\n\nAvailable: ${Object.keys(celebrities).join(', ')}`
             });
             return;
         }
 
-        // Send "generating" message
         const genMsg = await sock.sendMessage(context.from, {
-            text: '🎨 *Generating fake tweet...*\n⏳ Please wait...'
+            text: 'Generating fake tweet...'
         });
 
-        // Generate the tweet image
         const celebrity = celebrities[celebrityName];
         const imageBuffer = await generateFakeTweet(celebrity, message);
 
-        // Send the image
         await sock.sendMessage(context.from, {
-            image: imageBuffer
+            image: imageBuffer,
+            caption: `Fake tweet from ${celebrity.name}\n\nThis is NOT a real tweet`
         });
 
-        // Delete the "generating" message
-        await sock.sendMessage(context.from, {
-            delete: genMsg.key
-        });
+        await sock.sendMessage(context.from, { delete: genMsg.key });
 
     } catch (error) {
         console.error('Error in faketweet command:', error);
         await sock.sendMessage(context.from, {
-            text: `❌ *Error generating fake tweet*\n\n${error.message}\n\nPlease try again later.`
+            text: `Error generating fake tweet\n\n${error.message}`
         });
     }
 };
