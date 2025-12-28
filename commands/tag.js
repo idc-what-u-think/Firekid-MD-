@@ -5,7 +5,7 @@ const tag = async (sock, msg, args, context) => {
         });
     }
     
-    const OWNER_ID = '2348064610975@s.whatsapp.net';
+    const OWNER_ID = `${process.env.OWNER_NUMBER}@s.whatsapp.net`;
     
     try {
         const groupMetadata = await sock.groupMetadata(context.from);
@@ -16,7 +16,7 @@ const tag = async (sock, msg, args, context) => {
         
         if (!isAdmin && !isOwner) {
             return await sock.sendMessage(context.from, {
-                text: '❌ Only group admins can use this command'
+                text: '❌ Only group admins and the bot owner can use this command'
             });
         }
         
